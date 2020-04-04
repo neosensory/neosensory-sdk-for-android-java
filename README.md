@@ -28,4 +28,4 @@ usage of the Neosensory API to interface with Neosensory products is
 still  subject to the Neosensory developer terms of service located at:
 https://neosensory.com/legal/dev-terms-service.
 
-See [LICENSE](https://github.com/neosensory/neosensory-sdk-for-bluefruit/blob/master/LICENSE).
+See [LICENSE]https://github.com/neosensory/neosensory-java-sdk-for-android/blob/master/LICENSE).
