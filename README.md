@@ -1,4 +1,4 @@
-# neosensory-java-sdk-for-android
+# neosensory-sdk-for-android-java
 A Java-based SDK to help streamline controlling Neosensory devices over Bluetooth Low Energy on Android. Built on top of GitHub user weliem's [BLESSED for Android](https://github.com/weliem/blessed-android) library. The built in handler should be good enough for getting started, but you may want to customize it further.
 
 ## Installation
