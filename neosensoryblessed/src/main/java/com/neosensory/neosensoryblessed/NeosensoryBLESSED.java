@@ -70,7 +70,7 @@ public class NeosensoryBLESSED {
   // TODO: Create sync + async modes for awaiting CLI feedback
 
   /**
-   * @brief Request developer authorization. The CLI returns the message “Please type 'accept' and
+   * Request developer authorization. The CLI returns the message “Please type 'accept' and
    *     hit enter to agree to Neosensory Inc's Developer Terms and Conditions, which can be viewed
    *     at https://neosensory.com/legal/dev-terms-service”
    * @return true if connected to a valid device that is ready to accept CLI commands. TODO: handle
@@ -81,7 +81,7 @@ public class NeosensoryBLESSED {
   }
 
   /**
-   * @brief After successfully calling auth as developer, use the accept command to agree to the
+   * After successfully calling auth as developer, use the accept command to agree to the
    *     Neosensory Developer API License (https://neosensory.com/legal/dev-terms-service/).
    *     Successfully calling this unlocks the following commands: audio start, audio stop,
    *     motors_clear_queue, motors start, motors_stop, motors vibrate.
@@ -93,7 +93,7 @@ public class NeosensoryBLESSED {
   }
 
   /**
-   * @brief (Re)starts the device’s microphone audio acquisition. This command requires successful
+   * (Re)starts the device’s microphone audio acquisition. This command requires successful
    *     developer authorization, otherwise, the command will fail.
    * @return true if connected to a valid device that is ready to accept CLI commands. TODO: handle
    *     returning JSON response from the device
@@ -103,7 +103,7 @@ public class NeosensoryBLESSED {
   }
 
   /**
-   * @brief Stop the device’s microphone audio acquisition. This should be called prior to
+   * Stop the device’s microphone audio acquisition. This should be called prior to
    *     transmitting motor vibration data. This command requires successful developer
    *     authorization, otherwise, the command will fail.
    * @return true if connected to a valid device that is ready to accept CLI commands. TODO: handle
@@ -114,7 +114,7 @@ public class NeosensoryBLESSED {
   }
 
   /**
-   * @brief Obtain the device’s battery level in %. This command does not require developer
+   * Obtain the device’s battery level in %. This command does not require developer
    *     authorization
    * @return true if connected to a valid device that is ready to accept CLI commands. TODO: handle
    *     returning JSON response from the device
@@ -124,7 +124,7 @@ public class NeosensoryBLESSED {
   }
 
   /**
-   * @brief Obtain various device and firmware information. This command does not require developer
+   * Obtain various device and firmware information. This command does not require developer
    *     authorization.
    * @return true if connected to a valid device that is ready to accept CLI commands. TODO: handle
    *     returning JSON response from the device
@@ -134,7 +134,7 @@ public class NeosensoryBLESSED {
   }
 
   /**
-   * @brief Clear any vibration commands sitting the device’s motor FIFO queue. This should be
+   * Clear any vibration commands sitting the device’s motor FIFO queue. This should be
    *     called prior to streaming control frames using motors vibrate.
    * @return true if connected to a valid device that is ready to accept CLI commands. TODO: handle
    *     returning JSON response from the device
@@ -144,7 +144,7 @@ public class NeosensoryBLESSED {
   }
 
   /**
-   * @brief Initialize and start the motors interface. The motors can then accept motors vibrate
+   * Initialize and start the motors interface. The motors can then accept motors vibrate
    *     commands.
    * @return true if connected to a valid device that is ready to accept CLI commands. TODO: handle
    *     returning JSON response from the device
@@ -154,7 +154,7 @@ public class NeosensoryBLESSED {
   }
 
   /**
-   * @brief Clear the motors command queue and shut down the motor drivers.
+   * Clear the motors command queue and shut down the motor drivers.
    * @return true if connected to a valid device that is ready to accept CLI commands. TODO: handle
    *     returning JSON response from the device
    */
@@ -163,14 +163,14 @@ public class NeosensoryBLESSED {
   }
 
   /**
-   * @brief Set the actuators amplitudes on a connected Neosensory device
-   * @param[in] motorValues byte array of length # of motors of the target device (e.g. should be 4
+   * Set the actuators amplitudes on a connected Neosensory device. Note: actuators will stay vibrating
+   * indefinitely on the last frame received until a new control * frame is received
+   *
+   * @param motorValues byte array of length # of motors of the target device (e.g. should be 4
    *     if a Neosensory Buzz). Element values should between 0 (motor off) and 255 (motor at full
    *     amplitude). Example input format: new byte[] {(byte) 155, (byte) 0, (byte) 0, (byte) 0};
    * @return true if connected to a valid device that is ready to accept CLI commands. TODO: handle
    *     returning JSON response from the device
-   * @note actuators will stay vibrating indefinitely on the last frame received until a new control
-   *     frame is received
    */
   public boolean vibrateMotors(byte[] motorValues) {
     byte[] b64motorValues = Base64.getEncoder().encode(motorValues);
@@ -183,16 +183,16 @@ public class NeosensoryBLESSED {
     return neoCLIResponse;
   }
 
-  /** @brief If connected to a Neosensory device, disconnect it */
+  /** If connected to a Neosensory device, disconnect it */
   public void disconnectNeoDevice() {
-    if ((neoDeviceConnected == true) && (neoPeripheral != null)) {
+    if ((neoDeviceConnected) && (neoPeripheral != null)) {
       central.cancelConnection(neoPeripheral);
     }
   }
 
-  /** @brief Attempt to reconnect to a Neosensory device if disconnected */
+  /** Attempt to reconnect to a Neosensory device if disconnected */
   public void attemptNeoReconnect() {
-    if ((neoDeviceConnected == false) && (neoPeripheral != null)) {
+    if ((!neoDeviceConnected) && (neoPeripheral != null)) {
       handler.postDelayed(
           new Runnable() {
             @Override
@@ -221,12 +221,12 @@ public class NeosensoryBLESSED {
                 peripheral.getCharacteristic(UART_OVER_BLE_SERVICE_UUID, UART_RX_WRITE_UUID);
             neoCLIReady = true;
             broadcastCLIReadiness();
-            Log.i(TAG, String.format("SUCCESS: CLI ready to accept commands"));
+            Log.i(TAG, "SUCCESS: CLI ready to accept commands");
 
           } else {
             neoCLIReady = false;
             broadcastCLIReadiness();
-            Log.i(TAG, String.format("Failure: No services found on UUID"));
+            Log.i(TAG, "Failure: No services found on UUID");
           }
         }
 
@@ -358,7 +358,7 @@ public class NeosensoryBLESSED {
           Log.i(
               TAG, String.format("disconnected '%s' with status %d", peripheral.getName(), status));
           if (autoReconnectEnabled) {
-            if (neoDeviceConnected == false) {
+            if (!neoDeviceConnected) {
               handler.postDelayed(
                   new Runnable() {
                     @Override
@@ -381,11 +381,11 @@ public class NeosensoryBLESSED {
       };
 
   /**
-   * @brief Create and return instance using constructor used to connect to first discovered device
+   * Create and return instance using constructor used to connect to first discovered device
    *     containing the name "Buzz"
-   * @param[in] context the Android Context * @param[in] autoReconnect boolean for if the Bluetooth
+   * @param context the Android Context * @param[in] autoReconnect boolean for if the Bluetooth
    *     handler should automatically attempt to * reconnect to the device if a connection is lost.
-   * @param[in] autoReconnect boolean for if the Bluetooth handler should automatically attempt to *
+   * @param autoReconnect boolean for if the Bluetooth handler should automatically attempt to *
    *     reconnect to the device if a connection is lost.
    * @return the instance of the NeosensoryBLESSED object
    */
@@ -397,11 +397,11 @@ public class NeosensoryBLESSED {
   }
 
   /**
-   * @brief Create and return instance using constructor used to connect to a device with a specific
+   * Create and return instance using constructor used to connect to a device with a specific
    *     address e.g. "EB:CA:85:38:19:1D"
-   * @param[in] context the Android Context
-   * @param[in] neoAddress string in the format of a desired address e.g. "EB:CA:85:38:19:1D"
-   * @param[in] autoReconnect boolean for if the Bluetooth handler should automatically attempt to
+   * context the Android Context
+   * @param neoAddress string in the format of a desired address e.g. "EB:CA:85:38:19:1D"
+   * @param autoReconnect boolean for if the Bluetooth handler should automatically attempt to
    *     reconnect to the device if a connection is lost.
    * @return the instance of the NeosensoryBLESSED object
    */
@@ -414,10 +414,10 @@ public class NeosensoryBLESSED {
   }
 
   /**
-   * @brief Constructor used to connect to a device with a specific address e.g. "EB:CA:85:38:19:1D"
-   * @param[in] context the Android Context
-   * @param[in] neoAddress string in the format of a desired address e.g. "EB:CA:85:38:19:1D"
-   * @param[in] autoReconnect boolean for if the Bluetooth handler should automatically attempt to
+   * Constructor used to connect to a device with a specific address e.g. "EB:CA:85:38:19:1D"
+   * @param context the Android Context
+   * @param neoAddress string in the format of a desired address e.g. "EB:CA:85:38:19:1D"
+   * @param autoReconnect boolean for if the Bluetooth handler should automatically attempt to
    *     reconnect to the device if a connection is lost.
    */
   private NeosensoryBLESSED(Context context, String neoAddress, boolean autoReconnect) {
@@ -431,11 +431,10 @@ public class NeosensoryBLESSED {
   }
 
   /**
-   * @return the instance of the NeosensoryBLESSED object
-   * @brief Constructor used to connect to first discovered device containing the name "Buzz"
-   * @param[in] context the Android Context * @param[in] autoReconnect boolean for if the Bluetooth
+   * Constructor used to connect to first discovered device containing the name "Buzz"
+   * @param context the Android Context * @param[in] autoReconnect boolean for if the Bluetooth
    *     handler should automatically attempt to * reconnect to the device if a connection is lost.
-   * @param[in] autoReconnect boolean for if the Bluetooth handler should automatically attempt to
+   * @param autoReconnect boolean for if the Bluetooth handler should automatically attempt to
    *     reconnect to the device if a connection is lost.
    */
   private NeosensoryBLESSED(Context context, boolean autoReconnect) {

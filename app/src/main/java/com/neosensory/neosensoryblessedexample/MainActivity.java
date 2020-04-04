@@ -133,7 +133,7 @@ public class MainActivity extends AppCompatActivity {
             // acceptance of Neosensory's Terms of Service located at
             // https://neosensory.com/legal/dev-terms-service/
             blessedNeo.acceptAPIToS();
-            Log.i(TAG, String.format("state message", blessedNeo.getNeoCLIResponse()));
+            Log.i(TAG, String.format("state message: %s", blessedNeo.getNeoCLIResponse()));
             // Assuming successful authorization, set up a button to run the vibrating pattern
             // thread above
             neoVibrateButton.setVisibility(View.VISIBLE);
@@ -173,7 +173,7 @@ public class MainActivity extends AppCompatActivity {
         @Override
         public void onReceive(Context context, Intent intent) {
           Boolean connectedState = (Boolean) intent.getSerializableExtra("connectedState");
-          if (connectedState == true) {
+          if (connectedState) {
             neoCLIOutput.setVisibility(View.VISIBLE);
             neoCLIHeader.setVisibility(View.VISIBLE);
             neoConnectButton.setText("Disconnect");
