@@ -2,7 +2,6 @@ package com.neosensory.neosensoryblessedexample;
 
 import androidx.appcompat.app.AppCompatActivity;
 
-import android.hardware.camera2.params.BlackLevelPattern;
 import android.os.Bundle;
 import android.Manifest;
 import android.bluetooth.BluetoothAdapter;
@@ -35,6 +34,7 @@ public class MainActivity extends AppCompatActivity {
   @Override
   protected void onCreate(Bundle savedInstanceState) {
     super.onCreate(savedInstanceState);
+    // Set up initial view state
     setContentView(R.layout.activity_main);
     setContentView(R.layout.activity_main);
     neoCLIOutput = (TextView) findViewById(R.id.cli_response);
@@ -48,6 +48,7 @@ public class MainActivity extends AppCompatActivity {
     neoConnectButton.setVisibility(View.INVISIBLE);
     neoConnectButton.setClickable(false);
 
+    // Make sure Bluetooth is supported and has he needed permissions
     BluetoothAdapter bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
     if (bluetoothAdapter == null) return;
     if (!bluetoothAdapter.isEnabled()) {
@@ -55,6 +56,7 @@ public class MainActivity extends AppCompatActivity {
       startActivityForResult(enableBtIntent, REQUEST_ENABLE_BT);
     }
     if (hasPermissions()) {
+      // Display the connect button and create the Bluetooth Handler if so
       neoConnectButton.setClickable(true);
       neoConnectButton.setVisibility(View.VISIBLE);
       neoConnectButton.setOnClickListener(
@@ -67,7 +69,13 @@ public class MainActivity extends AppCompatActivity {
   }
 
   private void initBluetoothHandler() {
+    // Create and instance of the Bluetooth handler. This uses the constructor that will search for
+    // and connect to the first available device with "Buzz" in its name. To connect to a specific
+    // device with a specific address, you can use the following pattern:  blessedNeo =
+    // NeosensoryBLESSED.getInstance(getApplicationContext(), <address> e.g."EB:CA:85:38:19:1D",
+    // false);
     blessedNeo = NeosensoryBLESSED.getInstance(getApplicationContext(), false);
+    // register Receiver's so that NeosensoryBLESSED can pass relevant messages to MainActivity
     registerReceiver(CLIReceiver, new IntentFilter("CLIOutput"));
     registerReceiver(ConnectionStateReceiver, new IntentFilter("ConnectionState"));
     registerReceiver(CLIReadyReceiver, new IntentFilter("CLIAvailable"));
@@ -79,57 +87,71 @@ public class MainActivity extends AppCompatActivity {
     unregisterReceiver(CLIReceiver);
     unregisterReceiver(ConnectionStateReceiver);
     unregisterReceiver(CLIReadyReceiver);
-
   }
 
+  // The CLIReadyReceiver should receive a message anytime the connected Neosensory device changes
+  // state between being ready to receive CLI commands and not
   private final BroadcastReceiver CLIReadyReceiver =
       new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
-            class VibratingPattern implements Runnable {
-                private int minVibration = 40;
-                private int maxVibration = 255;
-                private int currentVibration = minVibration;
+          // Create a Runnable (thread) to send a repeating vibrating pattern. Should terminate if
+          // the variable `vibrating` is False
+          class VibratingPattern implements Runnable {
+            private int minVibration = 40;
+            private int maxVibration = 255;
+            private int currentVibration = minVibration;
 
-                public void run() {
-                    // loop until the thread is interrupted
-                    int motorID = 0;
-                    while (!Thread.currentThread().isInterrupted() && vibrating) {
-                        try {
-                            Thread.sleep(150);
-                            byte[] motorPattern = new byte[4];
-                            motorPattern[motorID] = (byte) currentVibration;
-                            blessedNeo.vibrateMotors(motorPattern);
-                            motorID = (motorID + 5) % NUM_MOTORS;
-                            currentVibration = (currentVibration + 1) % maxVibration;
-                            if (currentVibration == 0) {
-                                currentVibration = minVibration;
-                            }
-                        } catch (InterruptedException e) {
-                            e.printStackTrace();
-                        }
-                    }
+            public void run() {
+              // loop until the thread is interrupted
+              int motorID = 0;
+              while (!Thread.currentThread().isInterrupted() && vibrating) {
+                try {
+                  Thread.sleep(150);
+                  byte[] motorPattern = new byte[4];
+                  motorPattern[motorID] = (byte) currentVibration;
+                  blessedNeo.vibrateMotors(motorPattern);
+                  motorID = (motorID + 5) % NUM_MOTORS;
+                  currentVibration = (currentVibration + 1) % maxVibration;
+                  if (currentVibration == 0) {
+                    currentVibration = minVibration;
+                  }
+                } catch (InterruptedException e) {
+                  e.printStackTrace();
                 }
+              }
             }
-
+          }
+          // Check the message from Neosensory BLESSED to see if a Neosensory Command Line Interface
+          // has become ready to accept commands
           Boolean CLIReady = (Boolean) intent.getSerializableExtra("CLIReady");
           // Prior to calling other API commands we need to accept the Neosensory API ToS
           if (CLIReady) {
-            blessedNeo.sendAPIAuth();
+            // request developer level access to the connected Neosensory device
+            blessedNeo.sendDeveloperAPIAuth();
+            // sendDeveloperAPIAuth() will then transmit a message back requiring an explicit
+            // acceptance of Neosensory's Terms of Service located at
+            // https://neosensory.com/legal/dev-terms-service/
             blessedNeo.acceptAPIToS();
             Log.i(TAG, String.format("state message", blessedNeo.getNeoCLIResponse()));
-            // ... Assuming successful authorization:
+            // Assuming successful authorization, set up a button to run the vibrating pattern
+            // thread above
             neoVibrateButton.setVisibility(View.VISIBLE);
             neoVibrateButton.setClickable(true);
             neoVibrateButton.setOnClickListener(
                 new View.OnClickListener() {
                   public void onClick(View v) {
                     if (!vibrating) {
+                      // Prior to sending custom motor vibrate commands, we'll need to stop the
+                      // device's Audio task from running (assuming the device is a Neosensory Buzz)
                       blessedNeo.stopAudio();
+                      // Generally good practice to clear the motor command queue prior to sending
+                      // custom motor vibration commands
                       blessedNeo.clearMotorQueue();
                       blessedNeo.startMotors();
                       neoVibrateButton.setText("Stop Vibration Pattern");
                       vibrating = true;
+                      // Create and run the vibrating pattern thread
                       Runnable vibing = new VibratingPattern();
                       new Thread(vibing).start();
 
@@ -137,7 +159,6 @@ public class MainActivity extends AppCompatActivity {
                       neoVibrateButton.setText("Start Vibration Pattern");
                       vibrating = false;
                       blessedNeo.startAudio();
-
                     }
                   }
                 });
@@ -145,6 +166,8 @@ public class MainActivity extends AppCompatActivity {
         }
       };
 
+  // ConnectionStateReceiver is used to convey and process state changes whether or not a Neosensory
+  // device is connected
   private final BroadcastReceiver ConnectionStateReceiver =
       new BroadcastReceiver() {
         @Override
@@ -161,6 +184,7 @@ public class MainActivity extends AppCompatActivity {
                   }
                 });
           } else {
+            vibrating = false; // Just to be sure the vibrating pattern thread terminates
             neoCLIOutput.setVisibility(View.INVISIBLE);
             neoCLIHeader.setVisibility(View.INVISIBLE);
             neoVibrateButton.setVisibility(View.INVISIBLE);
@@ -175,7 +199,9 @@ public class MainActivity extends AppCompatActivity {
           }
         }
       };
-
+  // This BroadcastReceiver creates a notification whenever the connected device sends a response.
+  // Alternatively, can use the NeosensoryBLESSED method getNeoCLIResponse() to obtain the most
+  // recent response from the CLI.
   private final BroadcastReceiver CLIReceiver =
       new BroadcastReceiver() {
         @Override
