@@ -15,7 +15,7 @@ This library connects any Neosensory hardware (currently just Buzz).
 
 ## Documentation
 
-See GitHub repo at https://github.com/neosensory/neosensory-java-sdk-for-android.
+See GitHub repo at https://github.com/neosensory/neosensory-sdk-for-android-java.
 
 ## Examples
 
