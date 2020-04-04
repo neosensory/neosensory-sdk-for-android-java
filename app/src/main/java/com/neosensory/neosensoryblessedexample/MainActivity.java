@@ -12,6 +12,7 @@ import android.content.pm.PackageManager;
 import android.os.Build;
 import androidx.annotation.NonNull;
 
+import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 import android.widget.TextView;
@@ -19,25 +20,31 @@ import com.neosensory.neosensoryblessed.NeosensoryBLESSED;
 
 public class MainActivity extends AppCompatActivity {
   private final String TAG = MainActivity.class.getSimpleName();
-  private TextView NeoCLIOutput;
-  private TextView NeoCLIHeader;
-  private Button NeoConnectButton;
+  private TextView neoCLIOutput;
+  private TextView neoCLIHeader;
+  private Button neoConnectButton;
+  private Button neoVibrateButton;
   private static final int REQUEST_ENABLE_BT = 1;
   private static final int ACCESS_LOCATION_REQUEST = 2;
   private static final int ACCESS_COARSE_LOCATION_REQUEST = 2;
+  private NeosensoryBLESSED blessedNeo;
+  private static boolean vibrating = false;
 
   @Override
   protected void onCreate(Bundle savedInstanceState) {
     super.onCreate(savedInstanceState);
     setContentView(R.layout.activity_main);
     setContentView(R.layout.activity_main);
-    NeoCLIOutput = (TextView) findViewById(R.id.cli_response);
-    NeoCLIOutput.setVisibility(View.INVISIBLE);
-    NeoCLIHeader = (TextView) findViewById(R.id.cli_header);
-    NeoCLIHeader.setVisibility(View.INVISIBLE);
-    NeoConnectButton = (Button) findViewById(R.id.connection_button);
-    NeoConnectButton.setVisibility(View.INVISIBLE);
-    NeoConnectButton.setClickable(false);
+    neoCLIOutput = (TextView) findViewById(R.id.cli_response);
+    neoCLIOutput.setVisibility(View.INVISIBLE);
+    neoCLIHeader = (TextView) findViewById(R.id.cli_header);
+    neoCLIHeader.setVisibility(View.INVISIBLE);
+    neoVibrateButton = (Button) findViewById(R.id.pattern_button);
+    neoVibrateButton.setVisibility(View.INVISIBLE);
+    neoVibrateButton.setClickable(false);
+    neoConnectButton = (Button) findViewById(R.id.connection_button);
+    neoConnectButton.setVisibility(View.INVISIBLE);
+    neoConnectButton.setClickable(false);
 
     BluetoothAdapter bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
     if (bluetoothAdapter == null) return;
@@ -46,9 +53,9 @@ public class MainActivity extends AppCompatActivity {
       startActivityForResult(enableBtIntent, REQUEST_ENABLE_BT);
     }
     if (hasPermissions()) {
-      NeoConnectButton.setClickable(true);
-      NeoConnectButton.setVisibility(View.VISIBLE);
-      NeoConnectButton.setOnClickListener(
+      neoConnectButton.setClickable(true);
+      neoConnectButton.setVisibility(View.VISIBLE);
+      neoConnectButton.setOnClickListener(
           new View.OnClickListener() {
             public void onClick(View v) {
               initBluetoothHandler();
@@ -58,10 +65,10 @@ public class MainActivity extends AppCompatActivity {
   }
 
   private void initBluetoothHandler() {
-    NeosensoryBLESSED.getInstance(getApplicationContext());
-    // NeosensoryBLESSEDHandler.getInstance(getApplicationContext(),"EB:CA:85:38:19:1D");
+    blessedNeo = NeosensoryBLESSED.getInstance(getApplicationContext(), false);
     registerReceiver(CLIReceiver, new IntentFilter("CLIOutput"));
     registerReceiver(ConnectionStateReceiver, new IntentFilter("ConnectionState"));
+    registerReceiver(CLIReadyReceiver, new IntentFilter("CLIAvailable"));
   }
 
   @Override
@@ -69,7 +76,42 @@ public class MainActivity extends AppCompatActivity {
     super.onDestroy();
     unregisterReceiver(CLIReceiver);
     unregisterReceiver(ConnectionStateReceiver);
+    unregisterReceiver(CLIReadyReceiver);
   }
+
+  private final BroadcastReceiver CLIReadyReceiver =
+      new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+          Boolean CLIState = (Boolean) intent.getSerializableExtra("CLIReady");
+          // Prior to calling other API commands we need to accept the Neosensory API ToS
+          blessedNeo.sendAPIAuth();
+          blessedNeo.acceptAPIToS();
+          Log.i(TAG, String.format("state message", blessedNeo.getNeoCLIResponse()));
+          // assuming successful authorization:
+
+          neoVibrateButton.setVisibility(View.VISIBLE);
+          neoVibrateButton.setClickable(true);
+          neoVibrateButton.setOnClickListener(
+              new View.OnClickListener() {
+                public void onClick(View v) {
+                  if (!vibrating) {
+                    neoVibrateButton.setText("Stop Vibration Pattern");
+                    blessedNeo.stopAudio();
+                    blessedNeo.clearMotorQueue();
+                    blessedNeo.startMotors();
+                    blessedNeo.vibrateMotors(
+                        new byte[] {(byte) 255, (byte) 255, (byte) 255, (byte) 255});
+                    vibrating = true;
+                  } else {
+                    neoVibrateButton.setText("Start Vibration Pattern");
+                    blessedNeo.vibrateMotors(new byte[] {(byte) 0, (byte) 0, (byte) 0, (byte) 0});
+                    vibrating = false;
+                  }
+                }
+              });
+        }
+      };
 
   private final BroadcastReceiver ConnectionStateReceiver =
       new BroadcastReceiver() {
@@ -77,13 +119,27 @@ public class MainActivity extends AppCompatActivity {
         public void onReceive(Context context, Intent intent) {
           Boolean connectedState = (Boolean) intent.getSerializableExtra("connectedState");
           if (connectedState == true) {
-            NeoCLIOutput = (TextView) findViewById(R.id.cli_response);
-            NeoCLIOutput.setVisibility(View.VISIBLE);
-            NeoCLIHeader = (TextView) findViewById(R.id.cli_header);
-            NeoCLIHeader.setVisibility(View.VISIBLE);
-            NeoConnectButton = (Button) findViewById(R.id.connection_button);
-            NeoConnectButton.setVisibility(View.INVISIBLE);
-            NeoConnectButton.setClickable(false);
+            neoCLIOutput.setVisibility(View.VISIBLE);
+            neoCLIHeader.setVisibility(View.VISIBLE);
+            neoConnectButton.setText("Disconnect");
+            neoConnectButton.setOnClickListener(
+                new View.OnClickListener() {
+                  public void onClick(View v) {
+                    blessedNeo.disconnectNeoDevice();
+                  }
+                });
+          } else {
+            neoCLIOutput.setVisibility(View.INVISIBLE);
+            neoCLIHeader.setVisibility(View.INVISIBLE);
+            neoVibrateButton.setVisibility(View.INVISIBLE);
+            neoVibrateButton.setClickable(false);
+            neoConnectButton.setText("Scan and Connect to Neosensory Buzz");
+            neoConnectButton.setOnClickListener(
+                new View.OnClickListener() {
+                  public void onClick(View v) {
+                    blessedNeo.attemptNeoReconnect();
+                  }
+                });
           }
         }
       };
@@ -93,7 +149,7 @@ public class MainActivity extends AppCompatActivity {
         @Override
         public void onReceive(Context context, Intent intent) {
           String notification_value = (String) intent.getSerializableExtra("CLIResponse");
-          NeoCLIOutput.setText(notification_value);
+          neoCLIOutput.setText(notification_value);
         }
       };
 

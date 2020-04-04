@@ -50,6 +50,7 @@ public class NeosensoryBLESSED {
   private Handler handler = new Handler();
   private static BluetoothPeripheral neoPeripheral = null;
   private static BluetoothGattCharacteristic neoWriteCharacteristic = null;
+  private boolean autoReconnectEnabled = false;
   // Local state information
   private boolean neoDeviceConnected = false;
   private boolean neoCLIReady = false;
@@ -106,9 +107,32 @@ public class NeosensoryBLESSED {
   // Example input format: new byte[] {(byte) 155, (byte) 0, (byte) 0, (byte) 0};
   public boolean vibrateMotors(byte[] motorValues) {
     byte[] b64motorValues = Base64.getEncoder().encode(motorValues);
-    String fire_test_sequence =
+    String fire_command =
         "motors vibrate " + new String(b64motorValues, StandardCharsets.UTF_8) + "\n";
-    return sendCommand(fire_test_sequence);
+    return sendCommand(fire_command);
+  }
+
+  public String getNeoCLIResponse() {
+    return neoCLIResponse;
+  }
+
+  public void disconnectNeoDevice() {
+    if (neoDeviceConnected == true) {
+      central.cancelConnection(neoPeripheral);
+    }
+  }
+
+  public void attemptNeoReconnect() {
+    if (neoDeviceConnected == false) {
+      handler.postDelayed(
+          new Runnable() {
+            @Override
+            public void run() {
+              central.autoConnectPeripheral(neoPeripheral, peripheralCallback);
+            }
+          },
+          5000);
+    }
   }
 
   // Callback for peripherals
@@ -127,11 +151,12 @@ public class NeosensoryBLESSED {
             neoWriteCharacteristic =
                 peripheral.getCharacteristic(UART_OVER_BLE_SERVICE_UUID, UART_RX_WRITE_UUID);
             neoCLIReady = true;
-            broadcastCLIState();
+            broadcastCLIReadiness();
+            Log.i(TAG, String.format("SUCCESS: CLI ready to accept commands"));
 
           } else {
             neoCLIReady = false;
-            broadcastCLIState();
+            broadcastCLIReadiness();
             Log.i(TAG, String.format("Failure: No services found on UUID"));
           }
         }
@@ -208,8 +233,8 @@ public class NeosensoryBLESSED {
       };
 
   // create an Intent to broadcast if a connected Neosensory device is ready to accept commands
-  private void broadcastCLIState() {
-    Intent intent = new Intent("CLIOutput");
+  private void broadcastCLIReadiness() {
+    Intent intent = new Intent("CLIAvailable");
     intent.putExtra("CLIReady", neoCLIReady);
     context.sendBroadcast(intent);
   }
@@ -246,7 +271,7 @@ public class NeosensoryBLESSED {
           neoDeviceConnected = false;
           broadcastConnectedState();
           neoCLIReady = false;
-          broadcastCLIState();
+          broadcastCLIReadiness();
           Log.e(
               TAG,
               String.format("connection '%s' failed with status %d", peripheral.getName(), status));
@@ -259,20 +284,22 @@ public class NeosensoryBLESSED {
           neoDeviceConnected = false;
           broadcastConnectedState();
           neoCLIReady = false;
-          broadcastCLIState();
+          broadcastCLIReadiness();
 
           Log.i(
               TAG, String.format("disconnected '%s' with status %d", peripheral.getName(), status));
-
-          // Reconnect to this device when it becomes available again
-          handler.postDelayed(
-              new Runnable() {
-                @Override
-                public void run() {
-                  central.autoConnectPeripheral(peripheral, peripheralCallback);
-                }
-              },
-              5000);
+          if (autoReconnectEnabled) {
+            if (neoDeviceConnected == false) {
+              handler.postDelayed(
+                  new Runnable() {
+                    @Override
+                    public void run() {
+                      central.autoConnectPeripheral(peripheral, peripheralCallback);
+                    }
+                  },
+                  5000);
+            }
+          }
         }
 
         // Upon discovering target peripheral, stop scan and initiate connection.
@@ -290,9 +317,9 @@ public class NeosensoryBLESSED {
    *     containing the name "Buzz"
    * @param[in] context the Android Context
    */
-  public static synchronized NeosensoryBLESSED getInstance(Context context) {
+  public static synchronized NeosensoryBLESSED getInstance(Context context, boolean autoReconnect) {
     if (instance == null) {
-      instance = new NeosensoryBLESSED(context.getApplicationContext());
+      instance = new NeosensoryBLESSED(context.getApplicationContext(), autoReconnect);
     }
     return instance;
   }
@@ -304,9 +331,10 @@ public class NeosensoryBLESSED {
    * @param[in] context the Android Context
    * @param[in] neoAddress string in the format of a desired address e.g. "EB:CA:85:38:19:1D"
    */
-  public static synchronized NeosensoryBLESSED getInstance(Context context, String neoAddress) {
+  public static synchronized NeosensoryBLESSED getInstance(
+      Context context, String neoAddress, boolean autoReconnect) {
     if (instance == null) {
-      instance = new NeosensoryBLESSED(context.getApplicationContext(), neoAddress);
+      instance = new NeosensoryBLESSED(context.getApplicationContext(), neoAddress, autoReconnect);
     }
     return instance;
   }
@@ -314,8 +342,9 @@ public class NeosensoryBLESSED {
   /**
    * @brief Constructor used to connect to a device with a specific address e.g. "EB:CA:85:38:19:1D"
    */
-  private NeosensoryBLESSED(Context context, String neoAddress) {
+  private NeosensoryBLESSED(Context context, String neoAddress, boolean autoReconnect) {
     this.context = context;
+    autoReconnectEnabled = autoReconnect;
     // Create BluetoothCentral
     central = new BluetoothCentral(context, bluetoothCentralCallback, new Handler());
     // Scan for peripherals with a certain service UUIDs
@@ -324,8 +353,9 @@ public class NeosensoryBLESSED {
   }
 
   /** @brief Constructor used to connect to first discovered device containing the name "Buzz" */
-  private NeosensoryBLESSED(Context context) {
+  private NeosensoryBLESSED(Context context, boolean autoReconnect) {
     this.context = context;
+    autoReconnectEnabled = autoReconnect;
     // Create BluetoothCentral
     central = new BluetoothCentral(context, bluetoothCentralCallback, new Handler());
     // Scan for peripherals with a certain service UUIDs
