@@ -23,7 +23,7 @@ Currently this repo contains an Android example app that connects and vibrates t
 
 ## License
 
-Please note that while this Neosensory SDK has an MIT license, 
+Please note that while this Neosensory SDK has an Apache 2.0 license, 
 usage of the Neosensory API to interface with Neosensory products is 
 still  subject to the Neosensory developer terms of service located at:
 https://neosensory.com/legal/dev-terms-service.
