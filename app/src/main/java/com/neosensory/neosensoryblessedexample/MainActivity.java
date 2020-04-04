@@ -1,6 +1,8 @@
 package com.neosensory.neosensoryblessedexample;
 
 import androidx.appcompat.app.AppCompatActivity;
+
+import android.hardware.camera2.params.BlackLevelPattern;
 import android.os.Bundle;
 import android.Manifest;
 import android.bluetooth.BluetoothAdapter;
@@ -26,8 +28,8 @@ public class MainActivity extends AppCompatActivity {
   private Button neoVibrateButton;
   private static final int REQUEST_ENABLE_BT = 1;
   private static final int ACCESS_LOCATION_REQUEST = 2;
-  private static final int ACCESS_COARSE_LOCATION_REQUEST = 2;
-  private NeosensoryBLESSED blessedNeo;
+  private static final int NUM_MOTORS = 4;
+  private NeosensoryBLESSED blessedNeo = null;
   private static boolean vibrating = false;
 
   @Override
@@ -77,39 +79,69 @@ public class MainActivity extends AppCompatActivity {
     unregisterReceiver(CLIReceiver);
     unregisterReceiver(ConnectionStateReceiver);
     unregisterReceiver(CLIReadyReceiver);
+
   }
 
   private final BroadcastReceiver CLIReadyReceiver =
       new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
-          Boolean CLIState = (Boolean) intent.getSerializableExtra("CLIReady");
-          // Prior to calling other API commands we need to accept the Neosensory API ToS
-          blessedNeo.sendAPIAuth();
-          blessedNeo.acceptAPIToS();
-          Log.i(TAG, String.format("state message", blessedNeo.getNeoCLIResponse()));
-          // assuming successful authorization:
+            class VibratingPattern implements Runnable {
+                private int minVibration = 40;
+                private int maxVibration = 255;
+                private int currentVibration = minVibration;
 
-          neoVibrateButton.setVisibility(View.VISIBLE);
-          neoVibrateButton.setClickable(true);
-          neoVibrateButton.setOnClickListener(
-              new View.OnClickListener() {
-                public void onClick(View v) {
-                  if (!vibrating) {
-                    neoVibrateButton.setText("Stop Vibration Pattern");
-                    blessedNeo.stopAudio();
-                    blessedNeo.clearMotorQueue();
-                    blessedNeo.startMotors();
-                    blessedNeo.vibrateMotors(
-                        new byte[] {(byte) 255, (byte) 255, (byte) 255, (byte) 255});
-                    vibrating = true;
-                  } else {
-                    neoVibrateButton.setText("Start Vibration Pattern");
-                    blessedNeo.vibrateMotors(new byte[] {(byte) 0, (byte) 0, (byte) 0, (byte) 0});
-                    vibrating = false;
-                  }
+                public void run() {
+                    // loop until the thread is interrupted
+                    int motorID = 0;
+                    while (!Thread.currentThread().isInterrupted() && vibrating) {
+                        try {
+                            Thread.sleep(150);
+                            byte[] motorPattern = new byte[4];
+                            motorPattern[motorID] = (byte) currentVibration;
+                            blessedNeo.vibrateMotors(motorPattern);
+                            motorID = (motorID + 5) % NUM_MOTORS;
+                            currentVibration = (currentVibration + 1) % maxVibration;
+                            if (currentVibration == 0) {
+                                currentVibration = minVibration;
+                            }
+                        } catch (InterruptedException e) {
+                            e.printStackTrace();
+                        }
+                    }
                 }
-              });
+            }
+
+          Boolean CLIReady = (Boolean) intent.getSerializableExtra("CLIReady");
+          // Prior to calling other API commands we need to accept the Neosensory API ToS
+          if (CLIReady) {
+            blessedNeo.sendAPIAuth();
+            blessedNeo.acceptAPIToS();
+            Log.i(TAG, String.format("state message", blessedNeo.getNeoCLIResponse()));
+            // ... Assuming successful authorization:
+            neoVibrateButton.setVisibility(View.VISIBLE);
+            neoVibrateButton.setClickable(true);
+            neoVibrateButton.setOnClickListener(
+                new View.OnClickListener() {
+                  public void onClick(View v) {
+                    if (!vibrating) {
+                      blessedNeo.stopAudio();
+                      blessedNeo.clearMotorQueue();
+                      blessedNeo.startMotors();
+                      neoVibrateButton.setText("Stop Vibration Pattern");
+                      vibrating = true;
+                      Runnable vibing = new VibratingPattern();
+                      new Thread(vibing).start();
+
+                    } else {
+                      neoVibrateButton.setText("Start Vibration Pattern");
+                      vibrating = false;
+                      blessedNeo.startAudio();
+
+                    }
+                  }
+                });
+          }
         }
       };
 
