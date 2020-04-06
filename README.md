@@ -3,7 +3,7 @@ A Java-based SDK to help streamline controlling Neosensory devices over Bluetoot
 
 ## Installation
 
-Use Jitpack to add the module dependency in your project + app build.gradle files. Click the jitback button the GitHub repo page for instructions.
+Use Jitpack to add the module dependency in your project + app build.gradle files. Click the jitback button on this GitHub repo page for instructions. Alternatively, you can clone this repo and import the neosensoryblessed module into your own project. You will still need to add the line `maven { url 'https://jitpack.io' }` in your project's build.gradle file under `allprojects { repositories { ... ` to ensure that BLESSED for Android dependency can be imported.
 
 ## Dependencies
 
