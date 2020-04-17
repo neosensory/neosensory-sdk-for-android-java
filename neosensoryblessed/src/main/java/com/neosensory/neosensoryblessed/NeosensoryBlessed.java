@@ -1,5 +1,7 @@
 package com.neosensory.neosensoryblessed;
 
+import android.app.Activity;
+import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothGattCharacteristic;
 import android.bluetooth.le.ScanResult;
 import android.content.Context;
@@ -29,6 +31,7 @@ public class NeosensoryBlessed {
 
   private final String TAG = NeosensoryBlessed.class.getSimpleName();
 
+  private static final int REQUEST_ENABLE_BT = 1;
   public static final int MAX_VIBRATION_AMP = 255;
   public static final int MIN_VIBRATION_AMP = 0;
 
@@ -469,6 +472,22 @@ public class NeosensoryBlessed {
       instance = new NeosensoryBlessed(context.getApplicationContext(), autoReconnect);
     }
     return instance;
+  }
+
+  /**
+   * Request the Activity enable Bluetooth
+   *
+   * @param activity the Activity trying to call this. Typically you would pass in the variable
+   *     `this` from the Activity.
+   */
+  public static void requestBluetoothOn(Activity activity) {
+    // Make sure Bluetooth is supported and has the needed permissions
+    BluetoothAdapter bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
+    if (bluetoothAdapter == null) return;
+    if (!bluetoothAdapter.isEnabled()) {
+      Intent enableBtIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
+      activity.startActivityForResult(enableBtIntent, REQUEST_ENABLE_BT);
+    }
   }
 
   /**

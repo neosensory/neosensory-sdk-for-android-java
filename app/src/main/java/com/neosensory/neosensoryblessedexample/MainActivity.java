@@ -30,7 +30,6 @@ public class MainActivity extends AppCompatActivity {
   private Button neoVibrateButton;
 
   // Constants
-  private static final int REQUEST_ENABLE_BT = 1;
   private static final int ACCESS_LOCATION_REQUEST = 2;
   private static final int NUM_MOTORS = 4;
 
@@ -55,7 +54,7 @@ public class MainActivity extends AppCompatActivity {
     neoConnectButton = (Button) findViewById(R.id.connection_button);
 
     displayInitialUI();
-    requestBluetoothOn();
+    NeosensoryBlessed.requestBluetoothOn(this);
     checkLocationPermissions();
 
     // Create the vibrating pattern thread (but don't start it yet)
@@ -272,16 +271,6 @@ public class MainActivity extends AppCompatActivity {
     // command line interface (CLI) is available, it can be presumed that the device is connected.
     // Similarly, on a disconnect, the CLI state Receiver will be called and the CLI will be
     // unavailable.
-  }
-
-  private void requestBluetoothOn() {
-    // Make sure Bluetooth is supported and has the needed permissions
-    BluetoothAdapter bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
-    if (bluetoothAdapter == null) return;
-    if (!bluetoothAdapter.isEnabled()) {
-      Intent enableBtIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
-      startActivityForResult(enableBtIntent, REQUEST_ENABLE_BT);
-    }
   }
 
   private void checkLocationPermissions() {
