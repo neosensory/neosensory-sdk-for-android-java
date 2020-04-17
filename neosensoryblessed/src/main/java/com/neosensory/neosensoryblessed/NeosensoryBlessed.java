@@ -463,13 +463,16 @@ public class NeosensoryBlessed {
    *
    * @param context the Android Context * @param[in] autoReconnect boolean for if the Bluetooth
    *     handler should automatically attempt to * reconnect to the device if a connection is lost.
+   * @param neoNames a list of Strings for finding a potential device to connect to by name. For
+   *     example, if given just the entry {"Buzz"}, the module will attempt to connect to the first
+   *     device found containing the "Buzz" in the name.
    * @param autoReconnect boolean for if the Bluetooth handler should automatically attempt to *
    *     reconnect to the device if a connection is lost.
    * @return the instance of the NeosensoryBLESSED object
    */
-  public static synchronized NeosensoryBlessed getInstance(Context context, boolean autoReconnect) {
+  public static synchronized NeosensoryBlessed getInstance(Context context,  String[] neoNames, boolean autoReconnect) {
     if (instance == null) {
-      instance = new NeosensoryBlessed(context.getApplicationContext(), autoReconnect);
+      instance = new NeosensoryBlessed(context.getApplicationContext(), neoNames, autoReconnect);
     }
     return instance;
   }
@@ -530,16 +533,19 @@ public class NeosensoryBlessed {
    *
    * @param context the Android Context * @param[in] autoReconnect boolean for if the Bluetooth
    *     handler should automatically attempt to * reconnect to the device if a connection is lost.
+   * @param neoNames a list of Strings for finding a potential device to connect to by name. For
+   *     example, if given just the entry {"Buzz"}, the module will attempt to connect to the first
+   *     device found containing the "Buzz" in the name.
    * @param autoReconnect boolean for if the Bluetooth handler should automatically attempt to
    *     reconnect to the device if a connection is lost.
    */
-  private NeosensoryBlessed(Context context, boolean autoReconnect) {
+  private NeosensoryBlessed(Context context, String[] neoNames, boolean autoReconnect) {
     this.context = context;
     autoReconnectEnabled = autoReconnect;
     // Create BluetoothCentral
     central = new BluetoothCentral(context, bluetoothCentralCallback, new Handler());
     // Scan for peripherals with a certain service UUIDs
     central.startPairingPopupHack();
-    central.scanForPeripheralsWithNames(new String[] {"Buzz"});
+    central.scanForPeripheralsWithNames(neoNames);
   }
 }

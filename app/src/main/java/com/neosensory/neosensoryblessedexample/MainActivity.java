@@ -263,7 +263,7 @@ public class MainActivity extends AppCompatActivity {
     // device with a specific address, you can use the following pattern:  blessedNeo =
     // NeosensoryBLESSED.getInstance(getApplicationContext(), <address> e.g."EB:CA:85:38:19:1D",
     // false);
-    blessedNeo = NeosensoryBlessed.getInstance(getApplicationContext(), false);
+    blessedNeo = NeosensoryBlessed.getInstance(getApplicationContext(), new String[] {"Buzz"}, false);
     // register receivers so that NeosensoryBLESSED can pass relevant messages to MainActivity
     registerReceiver(CliReceiver, new IntentFilter("CliOutput"));
     registerReceiver(CliReadyReceiver, new IntentFilter("CliAvailable"));
