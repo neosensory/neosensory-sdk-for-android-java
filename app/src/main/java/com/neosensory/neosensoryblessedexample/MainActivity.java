@@ -3,7 +3,6 @@ package com.neosensory.neosensoryblessedexample;
 import androidx.appcompat.app.AppCompatActivity;
 import android.os.Bundle;
 import android.Manifest;
-import android.bluetooth.BluetoothAdapter;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
@@ -55,7 +54,10 @@ public class MainActivity extends AppCompatActivity {
 
     displayInitialUI();
     NeosensoryBlessed.requestBluetoothOn(this);
-    checkLocationPermissions();
+    if (checkLocationPermissions()) {
+      displayConnectButton();
+    } // Else, this function will have the system request permissions and handle displaying the
+      // button in the callback onRequestPermissionsResult
 
     // Create the vibrating pattern thread (but don't start it yet)
     vibratingPattern = new VibratingPattern();
@@ -132,7 +134,7 @@ public class MainActivity extends AppCompatActivity {
       new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
-          // Check the message from Neosensory BLESSED to see if a Neosensory Command Line Interface
+          // Check the message from NeosensoryBlessed to see if a Neosensory Command Line Interface
           // has become ready to accept commands
           // Prior to calling other API commands we need to accept the Neosensory API ToS
           if (blessedNeo.getNeoCliReady()) {
@@ -141,7 +143,7 @@ public class MainActivity extends AppCompatActivity {
             // sendDeveloperAPIAuth() will then transmit a message back requiring an explicit
             // acceptance of Neosensory's Terms of Service located at
             // https://neosensory.com/legal/dev-terms-service/
-            blessedNeo.acceptAPIToS();
+            blessedNeo.acceptApiTerms();
             Log.i(TAG, String.format("state message: %s", blessedNeo.getNeoCliResponse()));
             // Assuming successful authorization, set up a button to run the vibrating pattern
             // thread above
@@ -258,13 +260,14 @@ public class MainActivity extends AppCompatActivity {
   //////////////////////////////////////////////
 
   private void initBluetoothHandler() {
-    // Create and instance of the Bluetooth handler. This uses the constructor that will search for
+    // Create an instance of the Bluetooth handler. This uses the constructor that will search for
     // and connect to the first available device with "Buzz" in its name. To connect to a specific
     // device with a specific address, you can use the following pattern:  blessedNeo =
-    // NeosensoryBLESSED.getInstance(getApplicationContext(), <address> e.g."EB:CA:85:38:19:1D",
+    // NeosensoryBlessed.getInstance(getApplicationContext(), <address> e.g."EB:CA:85:38:19:1D",
     // false);
-    blessedNeo = NeosensoryBlessed.getInstance(getApplicationContext(), new String[] {"Buzz"}, false);
-    // register receivers so that NeosensoryBLESSED can pass relevant messages to MainActivity
+    blessedNeo =
+        NeosensoryBlessed.getInstance(getApplicationContext(), new String[] {"Buzz"}, false);
+    // register receivers so that NeosensoryBlessed can pass relevant messages to MainActivity
     registerReceiver(CliReceiver, new IntentFilter("CliOutput"));
     registerReceiver(CliReadyReceiver, new IntentFilter("CliAvailable"));
     // Note: there is also a Receiver for changes in the connection state, but is optional. If the
@@ -273,7 +276,7 @@ public class MainActivity extends AppCompatActivity {
     // unavailable.
   }
 
-  private void checkLocationPermissions() {
+  private boolean checkLocationPermissions() {
     int targetSdkVersion = getApplicationInfo().targetSdkVersion;
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q
         && targetSdkVersion >= Build.VERSION_CODES.Q) {
@@ -281,16 +284,18 @@ public class MainActivity extends AppCompatActivity {
           != PackageManager.PERMISSION_GRANTED) {
         requestPermissions(
             new String[] {Manifest.permission.ACCESS_FINE_LOCATION}, ACCESS_LOCATION_REQUEST);
+        return false;
       } else {
-        displayConnectButton();
+        return true;
       }
     } else {
       if (getApplicationContext().checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION)
           != PackageManager.PERMISSION_GRANTED) {
         requestPermissions(
             new String[] {Manifest.permission.ACCESS_COARSE_LOCATION}, ACCESS_LOCATION_REQUEST);
+        return false;
       } else {
-        displayConnectButton();
+        return true;
       }
     }
   }
@@ -303,7 +308,7 @@ public class MainActivity extends AppCompatActivity {
         && (grantResults[0] == PackageManager.PERMISSION_GRANTED)) {
       displayConnectButton();
     } else {
-      toastMessage("Unable to obtain location permissions, which are required for to use Bluetooth.");
+      toastMessage("Unable to obtain location permissions, which are required to use Bluetooth.");
       super.onRequestPermissionsResult(requestCode, permissions, grantResults);
     }
   }

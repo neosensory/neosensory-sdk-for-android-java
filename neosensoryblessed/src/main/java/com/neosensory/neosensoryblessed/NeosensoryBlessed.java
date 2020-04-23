@@ -25,7 +25,7 @@ import java.util.UUID;
 import static android.bluetooth.BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT;
 import static com.welie.blessed.BluetoothBytesParser.bytes2String;
 import static com.welie.blessed.BluetoothPeripheral.GATT_SUCCESS;
-import static java.lang.Math.exp;
+
 
 public class NeosensoryBlessed {
 
@@ -64,7 +64,7 @@ public class NeosensoryBlessed {
   private String neoCliResponse = "";
 
   /**
-   * Check to see it Android is connected to a Neosensory device
+   * Check to see if Android is connected to a Neosensory device
    *
    * @return True if connected. False otherwise.
    */
@@ -143,7 +143,7 @@ public class NeosensoryBlessed {
    * @return true if connected to a valid device that is ready to accept CLI commands. TODO: handle
    *     returning JSON response from the device
    */
-  public boolean acceptAPIToS() {
+  public boolean acceptApiTerms() {
     return sendCommand("accept\n");
   }
 
@@ -399,7 +399,7 @@ public class NeosensoryBlessed {
     context.sendBroadcast(intent);
   }
 
-  // Example callback processing for BLESSED
+  // Callbacks for processing Bluetooth state changes
   private final BluetoothCentralCallback bluetoothCentralCallback =
       new BluetoothCentralCallback() {
         // Upon connecting to a peripheral, log the output and  broadcast message (e.g. to Main
@@ -468,7 +468,7 @@ public class NeosensoryBlessed {
    *     device found containing the "Buzz" in the name.
    * @param autoReconnect boolean for if the Bluetooth handler should automatically attempt to *
    *     reconnect to the device if a connection is lost.
-   * @return the instance of the NeosensoryBLESSED object
+   * @return the instance of the NeosensoryBlessed object
    */
   public static synchronized NeosensoryBlessed getInstance(Context context,  String[] neoNames, boolean autoReconnect) {
     if (instance == null) {
@@ -500,7 +500,7 @@ public class NeosensoryBlessed {
    * @param neoAddress string in the format of a desired address e.g. "EB:CA:85:38:19:1D"
    * @param autoReconnect boolean for if the Bluetooth handler should automatically attempt to
    *     reconnect to the device if a connection is lost.
-   * @return the instance of the NeosensoryBLESSED object
+   * @return the instance of the NeosensoryBlessed object
    */
   public static synchronized NeosensoryBlessed getInstance(
       Context context, String neoAddress, boolean autoReconnect) {
