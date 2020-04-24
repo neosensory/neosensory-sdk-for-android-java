@@ -55,7 +55,7 @@ public class MainActivity extends AppCompatActivity {
     displayInitialUI();
     NeosensoryBlessed.requestBluetoothOn(this);
     if (checkLocationPermissions()) {
-      displayConnectButton();
+      displayInitConnectButton();
     } // Else, this function will have the system request permissions and handle displaying the
       // button in the callback onRequestPermissionsResult
 
@@ -170,12 +170,7 @@ public class MainActivity extends AppCompatActivity {
   //////////////////////////////////
 
   private void displayInitialUI() {
-    neoCliOutput.setVisibility(View.INVISIBLE);
-    neoCliHeader.setVisibility(View.INVISIBLE);
-    neoVibrateButton.setVisibility(View.INVISIBLE);
-    neoVibrateButton.setClickable(false);
-    neoConnectButton.setVisibility(View.INVISIBLE);
-    neoConnectButton.setClickable(false);
+    displayReconnectUI();
     neoVibrateButton.setOnClickListener(
         new View.OnClickListener() {
           public void onClick(View v) {
@@ -207,6 +202,7 @@ public class MainActivity extends AppCompatActivity {
         new View.OnClickListener() {
           public void onClick(View v) {
             blessedNeo.attemptNeoReconnect();
+            toastMessage("Attempting to reconnect. This may take a few seconds.");
           }
         });
   }
@@ -232,7 +228,7 @@ public class MainActivity extends AppCompatActivity {
         });
   }
 
-  private void displayConnectButton() {
+  private void displayInitConnectButton() {
     // Display the connect button and create the Bluetooth Handler if so
     neoConnectButton.setClickable(true);
     neoConnectButton.setVisibility(View.VISIBLE);
@@ -306,7 +302,7 @@ public class MainActivity extends AppCompatActivity {
     if ((requestCode == ACCESS_LOCATION_REQUEST)
         && (grantResults.length > 0)
         && (grantResults[0] == PackageManager.PERMISSION_GRANTED)) {
-      displayConnectButton();
+      displayInitConnectButton();
     } else {
       toastMessage("Unable to obtain location permissions, which are required to use Bluetooth.");
       super.onRequestPermissionsResult(requestCode, permissions, grantResults);

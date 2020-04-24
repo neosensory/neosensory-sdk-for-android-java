@@ -30,7 +30,7 @@ public class NeoBuzzPsychophysics {
   /**
    * With Buzz, rather than feeling 4 discrete locations for each actuator around the wrist, it is
    * possible to use a haptic illusion to create perceived points of vibration interpolated between
-   * the actuators. This method
+   * the actuators.
    *
    * @param linearIntensity: float on [0 1] of a vibrational intensity to be perceived
    * @param location float on [0 1] for the location around the wrist where the perceived vibration
