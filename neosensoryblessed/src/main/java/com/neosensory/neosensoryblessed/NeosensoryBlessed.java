@@ -124,7 +124,7 @@ public class NeosensoryBlessed {
   /**
    * Request developer authorization. The CLI returns the message “Please type 'accept' and hit
    * enter to agree to Neosensory Inc's Developer Terms and Conditions, which can be viewed at
-   * https://neosensory.com/legal/dev-terms-service”
+   * https://neosensory.com/legal/dev-terms-service
    *
    * @return true if connected to a valid device that is ready to accept CLI commands. TODO: handle
    *     returning JSON response from the device
