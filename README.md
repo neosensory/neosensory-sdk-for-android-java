@@ -1,9 +1,13 @@
+[![](https://jitpack.io/v/neosensory/neosensory-sdk-for-android-java.svg)](https://jitpack.io/#neosensory/neosensory-sdk-for-android-java)
+
 # Neosensory SDK for Android (Java Edition).
 A Java-based SDK to help streamline controlling Neosensory devices over Bluetooth Low Energy on Android. This project is comprised of an example app and reusable module called `neosensoryblessed`, which is built on top of GitHub user weliem's [BLESSED for Android](https://github.com/weliem/blessed-android) library. The built in handler should be good enough for getting started, but you may want to customize it further. We will also be rolling out a Kotlin-based SDK in the coming months.
 
 ## Installation
 
-Use Jitpack to add the module dependency in your project + app build.gradle files. Click the jitback button on this GitHub repo page for instructions. Alternatively, you can clone this repo and import the neosensoryblessed module into your own project. You will still need to add the line `maven { url 'https://jitpack.io' }` in your project's build.gradle file under `allprojects { repositories { ... ` to ensure that the BLESSED for Android dependency can be imported.
+Use [JitPack](https://jitpack.io/#neosensory/neosensory-sdk-for-android-java) to add the module dependency in your project + app build.gradle files. Click the jitback button on this GitHub repo page for instructions. 
+
+Alternatively, you can clone this repo and import the neosensoryblessed module into your own project. If you do this, you will still need to add the line `maven { url 'https://jitpack.io' }` in your project's build.gradle file under `allprojects { repositories { ... ` to ensure that the [BLESSED](https://github.com/weliem/blessed-android) for Android dependency can be imported.
 
 ## Dependencies
 
