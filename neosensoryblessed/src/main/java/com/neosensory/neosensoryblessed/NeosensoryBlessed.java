@@ -26,7 +26,6 @@ import static android.bluetooth.BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT;
 import static com.welie.blessed.BluetoothBytesParser.bytes2String;
 import static com.welie.blessed.BluetoothPeripheral.GATT_SUCCESS;
 
-
 public class NeosensoryBlessed {
 
   private final String TAG = NeosensoryBlessed.class.getSimpleName();
@@ -458,26 +457,6 @@ public class NeosensoryBlessed {
       };
 
   /**
-   * Create and return instance using constructor used to connect to first discovered device
-   * containing the name "Buzz"
-   *
-   * @param context the Android Context * @param[in] autoReconnect boolean for if the Bluetooth
-   *     handler should automatically attempt to * reconnect to the device if a connection is lost.
-   * @param neoNames a list of Strings for finding a potential device to connect to by name. For
-   *     example, if given just the entry {"Buzz"}, the module will attempt to connect to the first
-   *     device found containing the "Buzz" in the name.
-   * @param autoReconnect boolean for if the Bluetooth handler should automatically attempt to *
-   *     reconnect to the device if a connection is lost.
-   * @return the instance of the NeosensoryBlessed object
-   */
-  public static synchronized NeosensoryBlessed getInstance(Context context,  String[] neoNames, boolean autoReconnect) {
-    if (instance == null) {
-      instance = new NeosensoryBlessed(context.getApplicationContext(), neoNames, autoReconnect);
-    }
-    return instance;
-  }
-
-  /**
    * Request the Activity enable Bluetooth
    *
    * @param activity the Activity trying to call this. Typically you would pass in the variable
@@ -494,8 +473,33 @@ public class NeosensoryBlessed {
   }
 
   /**
+   * Create and return instance using constructor used to connect to first discovered device
+   * containing the name "Buzz" NOTE: There should only exist one instance of NeosensoryBlessed at a
+   * time. If you try to create a new instance, the parameters will be ignored and you'll get the
+   * previously created instance.
+   *
+   * @param context the Android Context * @param[in] autoReconnect boolean for if the Bluetooth
+   *     handler should automatically attempt to * reconnect to the device if a connection is lost.
+   * @param neoNames a list of Strings for finding a potential device to connect to by name. For
+   *     example, if given just the entry {"Buzz"}, the module will attempt to connect to the first
+   *     device found containing the "Buzz" in the name.
+   * @param autoReconnect boolean for if the Bluetooth handler should automatically attempt to *
+   *     reconnect to the device if a connection is lost.
+   * @return the instance of the NeosensoryBlessed object
+   */
+  public static synchronized NeosensoryBlessed getInstance(
+      Context context, String[] neoNames, boolean autoReconnect) {
+    if (instance == null) {
+      instance = new NeosensoryBlessed(context.getApplicationContext(), neoNames, autoReconnect);
+    }
+    return instance;
+  }
+
+  /**
    * Create and return instance using constructor used to connect to a device with a specific
-   * address e.g. "EB:CA:85:38:19:1D" context the Android Context
+   * address e.g. "EB:CA:85:38:19:1D" context the Android Context. NOTE: There should only exist one
+   * instance of NeosensoryBlessed at a * time. If you try to create a new instance, the parameters
+   * will be ignored and you'll get the * previously created instance.
    *
    * @param neoAddress string in the format of a desired address e.g. "EB:CA:85:38:19:1D"
    * @param autoReconnect boolean for if the Bluetooth handler should automatically attempt to
@@ -535,7 +539,7 @@ public class NeosensoryBlessed {
    *     handler should automatically attempt to * reconnect to the device if a connection is lost.
    * @param neoNames a list of Strings for finding a potential device to connect to by name. For
    *     example, if given just the entry {"Buzz"}, the module will attempt to connect to the first
-   *     device found containing the "Buzz" in the name.
+   *     device found containing "Buzz" in the name.
    * @param autoReconnect boolean for if the Bluetooth handler should automatically attempt to
    *     reconnect to the device if a connection is lost.
    */
