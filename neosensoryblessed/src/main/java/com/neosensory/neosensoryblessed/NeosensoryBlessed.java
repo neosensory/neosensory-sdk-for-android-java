@@ -1,5 +1,7 @@
 package com.neosensory.neosensoryblessed;
 
+import android.app.Activity;
+import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothGattCharacteristic;
 import android.bluetooth.le.ScanResult;
 import android.content.Context;
@@ -20,14 +22,17 @@ import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.UUID;
 
-import static android.bluetooth.BluetoothGattCharacteristic.PROPERTY_WRITE;
 import static android.bluetooth.BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT;
 import static com.welie.blessed.BluetoothBytesParser.bytes2String;
 import static com.welie.blessed.BluetoothPeripheral.GATT_SUCCESS;
 
-public class NeosensoryBLESSED {
+public class NeosensoryBlessed {
 
-  private final String TAG = NeosensoryBLESSED.class.getSimpleName();
+  private final String TAG = NeosensoryBlessed.class.getSimpleName();
+
+  private static final int REQUEST_ENABLE_BT = 1;
+  public static final int MAX_VIBRATION_AMP = 255;
+  public static final int MIN_VIBRATION_AMP = 0;
 
   // UUIDs for Neosensory UART over BLE
   private static final UUID UART_OVER_BLE_SERVICE_UUID =
@@ -45,22 +50,50 @@ public class NeosensoryBLESSED {
 
   // Local variables
   private BluetoothCentral central;
-  private static NeosensoryBLESSED instance = null;
+  private static NeosensoryBlessed instance = null;
   private Context context;
   private Handler handler = new Handler();
   private static BluetoothPeripheral neoPeripheral = null;
   private static BluetoothGattCharacteristic neoWriteCharacteristic = null;
-  private boolean autoReconnectEnabled = false;
-  // Local state information
+
+  // State information
+  private boolean autoReconnectEnabled;
   private boolean neoDeviceConnected = false;
-  private boolean neoCLIReady = false;
-  private String neoCLIResponse = null;
+  private boolean neoCliReady = false;
+  private String neoCliResponse = "";
+
+  /**
+   * Check to see if Android is connected to a Neosensory device
+   *
+   * @return True if connected. False otherwise.
+   */
+  public boolean getNeoDeviceConnected() {
+    return neoDeviceConnected;
+  }
+
+  /**
+   * Check to see if a command line interface (CLI) is ready and available to accept commands
+   *
+   * @return True if the CLI is ready and available. False otherwise.
+   */
+  public boolean getNeoCliReady() {
+    return neoCliReady;
+  }
+
+  /**
+   * Get last obtained response from the command line interface (CLI)
+   *
+   * @return last obtained response as a String.
+   */
+  public String getNeoCliResponse() {
+    return neoCliResponse;
+  }
 
   // sendCommand encodes the command strings for the CLI in the proper format.
-  private boolean sendCommand(String CLICommand) {
-    if ((neoDeviceConnected) && (neoCLIReady)) {
-      byte[] CLIBytes = CLICommand.getBytes(StandardCharsets.UTF_8);
-      neoPeripheral.writeCharacteristic(neoWriteCharacteristic, CLIBytes, WRITE_TYPE_DEFAULT);
+  private boolean sendCommand(String CliCommand) {
+    if ((neoDeviceConnected) && (neoCliReady)) {
+      byte[] CliBytes = CliCommand.getBytes(StandardCharsets.UTF_8);
+      neoPeripheral.writeCharacteristic(neoWriteCharacteristic, CliBytes, WRITE_TYPE_DEFAULT);
       return true;
     } else {
       return false;
@@ -70,9 +103,29 @@ public class NeosensoryBLESSED {
   // TODO: Create sync + async modes for awaiting CLI feedback
 
   /**
-   * Request developer authorization. The CLI returns the message “Please type 'accept' and
-   *     hit enter to agree to Neosensory Inc's Developer Terms and Conditions, which can be viewed
-   *     at https://neosensory.com/legal/dev-terms-service”
+   * Pause the running algorithm on the device to accept motor control over the CLI. This command
+   * requires successful * developer authorization, otherwise, the command will fail. TODO: handle
+   * returning JSON responses from device
+   */
+  public void pauseDeviceAlgorithm() {
+    stopAudio();
+    enableMotors();
+  }
+
+  /**
+   * (Re)starts the device’s microphone audio acquisition / algorithm. This command requires
+   * successful developer authorization, otherwise, the command will fail. This is functionally the
+   * same as startAudio();
+   */
+  public void resumeDeviceAlgorithm() {
+    sendCommand("audio start\n");
+  }
+
+  /**
+   * Request developer authorization. The CLI returns the message “Please type 'accept' and hit
+   * enter to agree to Neosensory Inc's Developer Terms and Conditions, which can be viewed at
+   * https://neosensory.com/legal/dev-terms-service”
+   *
    * @return true if connected to a valid device that is ready to accept CLI commands. TODO: handle
    *     returning JSON response from the device
    */
@@ -81,20 +134,22 @@ public class NeosensoryBLESSED {
   }
 
   /**
-   * After successfully calling auth as developer, use the accept command to agree to the
-   *     Neosensory Developer API License (https://neosensory.com/legal/dev-terms-service/).
-   *     Successfully calling this unlocks the following commands: audio start, audio stop,
-   *     motors_clear_queue, motors start, motors_stop, motors vibrate.
+   * After successfully calling auth as developer, use the accept command to agree to the Neosensory
+   * Developer API License (https://neosensory.com/legal/dev-terms-service/). Successfully calling
+   * this unlocks the following commands: audio start, audio stop, motors_clear_queue, motors start,
+   * motors_stop, motors vibrate.
+   *
    * @return true if connected to a valid device that is ready to accept CLI commands. TODO: handle
    *     returning JSON response from the device
    */
-  public boolean acceptAPIToS() {
+  public boolean acceptApiTerms() {
     return sendCommand("accept\n");
   }
 
   /**
    * (Re)starts the device’s microphone audio acquisition. This command requires successful
-   *     developer authorization, otherwise, the command will fail.
+   * developer authorization, otherwise, the command will fail.
+   *
    * @return true if connected to a valid device that is ready to accept CLI commands. TODO: handle
    *     returning JSON response from the device
    */
@@ -103,19 +158,21 @@ public class NeosensoryBLESSED {
   }
 
   /**
-   * Stop the device’s microphone audio acquisition. This should be called prior to
-   *     transmitting motor vibration data. This command requires successful developer
-   *     authorization, otherwise, the command will fail.
+   * Stop the device’s microphone audio acquisition. This should be called prior to transmitting
+   * motor vibration data. This command requires successful developer authorization, otherwise, the
+   * command will fail.
+   *
    * @return true if connected to a valid device that is ready to accept CLI commands. TODO: handle
    *     returning JSON response from the device
    */
   public boolean stopAudio() {
-    return sendCommand("audio stop\n");
+    sendCommand("audio stop\n");
+    return clearMotorQueue(); // firmware currently requires clearing the motor queue after this
   }
 
   /**
-   * Obtain the device’s battery level in %. This command does not require developer
-   *     authorization
+   * Obtain the device’s battery level in %. This command does not require developer authorization
+   *
    * @return true if connected to a valid device that is ready to accept CLI commands. TODO: handle
    *     returning JSON response from the device
    */
@@ -125,7 +182,8 @@ public class NeosensoryBLESSED {
 
   /**
    * Obtain various device and firmware information. This command does not require developer
-   *     authorization.
+   * authorization.
+   *
    * @return true if connected to a valid device that is ready to accept CLI commands. TODO: handle
    *     returning JSON response from the device
    */
@@ -134,8 +192,10 @@ public class NeosensoryBLESSED {
   }
 
   /**
-   * Clear any vibration commands sitting the device’s motor FIFO queue. This should be
-   *     called prior to streaming control frames using motors vibrate.
+   * Clear any vibration commands sitting the device’s motor FIFO queue. This should be called prior
+   * to streaming control frames using motors vibrate. This command requires successful developer
+   * authorization, otherwise, the command will fail.
+   *
    * @return true if connected to a valid device that is ready to accept CLI commands. TODO: handle
    *     returning JSON response from the device
    */
@@ -144,43 +204,59 @@ public class NeosensoryBLESSED {
   }
 
   /**
-   * Initialize and start the motors interface. The motors can then accept motors vibrate
-   *     commands.
+   * Initialize and start the motors interface. The motors can then accept motors vibrate commands.
+   * This command requires successful developer authorization, otherwise, the command will fail.
+   *
    * @return true if connected to a valid device that is ready to accept CLI commands. TODO: handle
    *     returning JSON response from the device
    */
-  public boolean startMotors() {
+  public boolean enableMotors() {
     return sendCommand("motors start\n");
   }
 
   /**
-   * Clear the motors command queue and shut down the motor drivers.
+   * Clear the motors command queue and shut down the motor drivers. This command requires
+   * successful developer authorization, otherwise, the command will fail.
+   *
    * @return true if connected to a valid device that is ready to accept CLI commands. TODO: handle
    *     returning JSON response from the device
    */
-  public boolean stopMotors() {
+  public boolean disableMotors() {
     return sendCommand("motors stop\n");
   }
 
   /**
-   * Set the actuators amplitudes on a connected Neosensory device. Note: actuators will stay vibrating
-   * indefinitely on the last frame received until a new control * frame is received
+   * Send a frame that turns off the motors. Note the API CLI command "motors stop" disables the
+   * motor drivers. This command requires successful developer authorization, otherwise, the command
+   * will fail.
    *
-   * @param motorValues byte array of length # of motors of the target device (e.g. should be 4
-   *     if a Neosensory Buzz). Element values should between 0 (motor off) and 255 (motor at full
+   * @return true if connected to a valid device that is ready to accept CLI commands. TODO: handle
+   *     returning JSON response from the device
+   */
+  public boolean stopMotors() {
+    return vibrateMotors(new int[4]);
+  }
+
+  /**
+   * Set the actuators amplitudes on a connected Neosensory device. Note: actuators will stay
+   * vibrating indefinitely on the last frame received until a new control * frame is received
+   *
+   * @param motorValues byte array of length # of motors of the target device (e.g. should be 4 if a
+   *     Neosensory Buzz). Element values should between 0 (motor off) and 255 (motor at full
    *     amplitude). Example input format: new byte[] {(byte) 155, (byte) 0, (byte) 0, (byte) 0};
    * @return true if connected to a valid device that is ready to accept CLI commands. TODO: handle
    *     returning JSON response from the device
    */
-  public boolean vibrateMotors(byte[] motorValues) {
-    byte[] b64motorValues = Base64.getEncoder().encode(motorValues);
-    String fire_command =
+  public boolean vibrateMotors(int[] motorValues) {
+    // unfortunately, bytes are signed in java and our input values are on [0, 255]
+    byte[] motorValuesBytes = new byte[motorValues.length];
+    for (int i = 0; i < motorValues.length; i++) {
+      motorValuesBytes[i] = (byte) (motorValues[i]);
+    }
+    byte[] b64motorValues = Base64.getEncoder().encode(motorValuesBytes);
+    String fireCommand =
         "motors vibrate " + new String(b64motorValues, StandardCharsets.UTF_8) + "\n";
-    return sendCommand(fire_command);
-  }
-
-  public String getNeoCLIResponse() {
-    return neoCLIResponse;
+    return sendCommand(fireCommand);
   }
 
   /** If connected to a Neosensory device, disconnect it */
@@ -219,13 +295,13 @@ public class NeosensoryBLESSED {
             neoPeripheral = peripheral;
             neoWriteCharacteristic =
                 peripheral.getCharacteristic(UART_OVER_BLE_SERVICE_UUID, UART_RX_WRITE_UUID);
-            neoCLIReady = true;
-            broadcastCLIReadiness();
+            neoCliReady = true;
+            broadcastCliReadiness();
             Log.i(TAG, "SUCCESS: CLI ready to accept commands");
 
           } else {
-            neoCLIReady = false;
-            broadcastCLIReadiness();
+            neoCliReady = false;
+            broadcastCliReadiness();
             Log.i(TAG, "Failure: No services found on UUID");
           }
         }
@@ -291,9 +367,9 @@ public class NeosensoryBLESSED {
             String manufacturer = parser.getStringValue(0);
             Log.i(TAG, String.format("Received manufacturer: %s", manufacturer));
           } else if (characteristicUUID.equals(UART_TX_NOTIFY_UUID)) {
-            neoCLIResponse = parser.getStringValue(0);
-            Log.i(TAG, String.format("Received notification: %s", neoCLIResponse));
-            broadcastCLI(neoCLIResponse);
+            neoCliResponse = parser.getStringValue(0);
+            Log.i(TAG, String.format("Received notification: %s", neoCliResponse));
+            broadcastCLI(neoCliResponse);
           } else if (characteristicUUID.equals(UART_RX_WRITE_UUID)) {
             String rx_write_val = parser.getStringValue(0);
             Log.i(TAG, String.format("Received rxwrite: %s", rx_write_val));
@@ -302,16 +378,16 @@ public class NeosensoryBLESSED {
       };
 
   // create an Intent to broadcast if a connected Neosensory device is ready to accept commands
-  private void broadcastCLIReadiness() {
-    Intent intent = new Intent("CLIAvailable");
-    intent.putExtra("CLIReady", neoCLIReady);
+  private void broadcastCliReadiness() {
+    Intent intent = new Intent("CliAvailable");
+    intent.putExtra("CliReady", neoCliReady);
     context.sendBroadcast(intent);
   }
 
   // create an Intent to broadcast Neosensory CLI Output.
-  private void broadcastCLI(String CLIResponse) {
-    Intent intent = new Intent("CLIOutput");
-    intent.putExtra("CLIResponse", CLIResponse);
+  private void broadcastCLI(String CliResponse) {
+    Intent intent = new Intent("CliOutput");
+    intent.putExtra("CliResponse", CliResponse);
     context.sendBroadcast(intent);
   }
 
@@ -322,7 +398,7 @@ public class NeosensoryBLESSED {
     context.sendBroadcast(intent);
   }
 
-  // Example callback processing for BLESSED
+  // Callbacks for processing Bluetooth state changes
   private final BluetoothCentralCallback bluetoothCentralCallback =
       new BluetoothCentralCallback() {
         // Upon connecting to a peripheral, log the output and  broadcast message (e.g. to Main
@@ -339,8 +415,8 @@ public class NeosensoryBLESSED {
         public void onConnectionFailed(BluetoothPeripheral peripheral, final int status) {
           neoDeviceConnected = false;
           broadcastConnectedState();
-          neoCLIReady = false;
-          broadcastCLIReadiness();
+          neoCliReady = false;
+          broadcastCliReadiness();
           Log.e(
               TAG,
               String.format("connection '%s' failed with status %d", peripheral.getName(), status));
@@ -352,8 +428,8 @@ public class NeosensoryBLESSED {
             final BluetoothPeripheral peripheral, final int status) {
           neoDeviceConnected = false;
           broadcastConnectedState();
-          neoCLIReady = false;
-          broadcastCLIReadiness();
+          neoCliReady = false;
+          broadcastCliReadiness();
 
           Log.i(
               TAG, String.format("disconnected '%s' with status %d", peripheral.getName(), status));
@@ -381,46 +457,72 @@ public class NeosensoryBLESSED {
       };
 
   /**
+   * Request the Activity enable Bluetooth
+   *
+   * @param activity the Activity trying to call this. Typically you would pass in the variable
+   *     `this` from the Activity.
+   */
+  public static void requestBluetoothOn(Activity activity) {
+    // Make sure Bluetooth is supported and has the needed permissions
+    BluetoothAdapter bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
+    if (bluetoothAdapter == null) return;
+    if (!bluetoothAdapter.isEnabled()) {
+      Intent enableBtIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
+      activity.startActivityForResult(enableBtIntent, REQUEST_ENABLE_BT);
+    }
+  }
+
+  /**
    * Create and return instance using constructor used to connect to first discovered device
-   *     containing the name "Buzz"
+   * containing the name "Buzz" NOTE: There should only exist one instance of NeosensoryBlessed at a
+   * time. If you try to create a new instance, the parameters will be ignored and you'll get the
+   * previously created instance.
+   *
    * @param context the Android Context * @param[in] autoReconnect boolean for if the Bluetooth
    *     handler should automatically attempt to * reconnect to the device if a connection is lost.
+   * @param neoNames a list of Strings for finding a potential device to connect to by name. For
+   *     example, if given just the entry {"Buzz"}, the module will attempt to connect to the first
+   *     device found containing the "Buzz" in the name.
    * @param autoReconnect boolean for if the Bluetooth handler should automatically attempt to *
    *     reconnect to the device if a connection is lost.
-   * @return the instance of the NeosensoryBLESSED object
+   * @return the instance of the NeosensoryBlessed object
    */
-  public static synchronized NeosensoryBLESSED getInstance(Context context, boolean autoReconnect) {
+  public static synchronized NeosensoryBlessed getInstance(
+      Context context, String[] neoNames, boolean autoReconnect) {
     if (instance == null) {
-      instance = new NeosensoryBLESSED(context.getApplicationContext(), autoReconnect);
+      instance = new NeosensoryBlessed(context.getApplicationContext(), neoNames, autoReconnect);
     }
     return instance;
   }
 
   /**
    * Create and return instance using constructor used to connect to a device with a specific
-   *     address e.g. "EB:CA:85:38:19:1D"
-   * context the Android Context
+   * address e.g. "EB:CA:85:38:19:1D" context the Android Context. NOTE: There should only exist one
+   * instance of NeosensoryBlessed at a * time. If you try to create a new instance, the parameters
+   * will be ignored and you'll get the * previously created instance.
+   *
    * @param neoAddress string in the format of a desired address e.g. "EB:CA:85:38:19:1D"
    * @param autoReconnect boolean for if the Bluetooth handler should automatically attempt to
    *     reconnect to the device if a connection is lost.
-   * @return the instance of the NeosensoryBLESSED object
+   * @return the instance of the NeosensoryBlessed object
    */
-  public static synchronized NeosensoryBLESSED getInstance(
+  public static synchronized NeosensoryBlessed getInstance(
       Context context, String neoAddress, boolean autoReconnect) {
     if (instance == null) {
-      instance = new NeosensoryBLESSED(context.getApplicationContext(), neoAddress, autoReconnect);
+      instance = new NeosensoryBlessed(context.getApplicationContext(), neoAddress, autoReconnect);
     }
     return instance;
   }
 
   /**
    * Constructor used to connect to a device with a specific address e.g. "EB:CA:85:38:19:1D"
+   *
    * @param context the Android Context
    * @param neoAddress string in the format of a desired address e.g. "EB:CA:85:38:19:1D"
    * @param autoReconnect boolean for if the Bluetooth handler should automatically attempt to
    *     reconnect to the device if a connection is lost.
    */
-  private NeosensoryBLESSED(Context context, String neoAddress, boolean autoReconnect) {
+  private NeosensoryBlessed(Context context, String neoAddress, boolean autoReconnect) {
     this.context = context;
     autoReconnectEnabled = autoReconnect;
     // Create BluetoothCentral
@@ -432,18 +534,22 @@ public class NeosensoryBLESSED {
 
   /**
    * Constructor used to connect to first discovered device containing the name "Buzz"
+   *
    * @param context the Android Context * @param[in] autoReconnect boolean for if the Bluetooth
    *     handler should automatically attempt to * reconnect to the device if a connection is lost.
+   * @param neoNames a list of Strings for finding a potential device to connect to by name. For
+   *     example, if given just the entry {"Buzz"}, the module will attempt to connect to the first
+   *     device found containing "Buzz" in the name.
    * @param autoReconnect boolean for if the Bluetooth handler should automatically attempt to
    *     reconnect to the device if a connection is lost.
    */
-  private NeosensoryBLESSED(Context context, boolean autoReconnect) {
+  private NeosensoryBlessed(Context context, String[] neoNames, boolean autoReconnect) {
     this.context = context;
     autoReconnectEnabled = autoReconnect;
     // Create BluetoothCentral
     central = new BluetoothCentral(context, bluetoothCentralCallback, new Handler());
     // Scan for peripherals with a certain service UUIDs
     central.startPairingPopupHack();
-    central.scanForPeripheralsWithNames(new String[] {"Buzz"});
+    central.scanForPeripheralsWithNames(neoNames);
   }
 }
