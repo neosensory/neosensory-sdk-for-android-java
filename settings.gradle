@@ -1,3 +1,0 @@
-rootProject.name='NeosensoryBLESSEDExample'
-include ':app'
-include ':neosensoryblessed'
