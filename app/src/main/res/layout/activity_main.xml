@@ -8,11 +8,11 @@
 
     <TextView
         android:id="@+id/cli_response"
-        android:layout_width="323dp"
-        android:layout_height="402dp"
-        android:layout_marginTop="13dp"
+        android:layout_width="322dp"
+        android:layout_height="252dp"
+        android:layout_marginTop="50dp"
         android:textAlignment="center"
-        android:textSize="14sp"
+        android:textSize="24sp"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintHorizontal_bias="0.5"
         app:layout_constraintStart_toStartOf="parent"
@@ -22,12 +22,13 @@
         android:id="@+id/cli_header"
         android:layout_width="324dp"
         android:layout_height="20dp"
+        android:layout_marginTop="62dp"
         android:text="Neosensory Command Line Interface Output"
         android:textSize="16sp"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintHorizontal_bias="0.5"
         app:layout_constraintStart_toStartOf="parent"
-        tools:layout_editor_absoluteY="62dp" />
+        app:layout_constraintTop_toTopOf="parent" />
 
     <Button
         android:id="@+id/pattern_button"
