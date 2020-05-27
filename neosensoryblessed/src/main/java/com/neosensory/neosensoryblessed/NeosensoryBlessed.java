@@ -62,6 +62,12 @@ public class NeosensoryBlessed {
   private boolean neoCliReady = false;
   private String neoCliResponse = "";
 
+  private enum StatusUpdateType {
+    CLIREADINESS,
+    CLIMESSAGE,
+    CONNECTION
+  }
+
   /**
    * Check to see if Android is connected to a Neosensory device
    *
@@ -296,12 +302,12 @@ public class NeosensoryBlessed {
             neoWriteCharacteristic =
                 peripheral.getCharacteristic(UART_OVER_BLE_SERVICE_UUID, UART_RX_WRITE_UUID);
             neoCliReady = true;
-            broadcastCliReadiness();
+            broadcast(StatusUpdateType.CLIREADINESS,neoCliReady);
             Log.i(TAG, "SUCCESS: CLI ready to accept commands");
 
           } else {
             neoCliReady = false;
-            broadcastCliReadiness();
+            broadcast(StatusUpdateType.CLIREADINESS,neoCliReady);
             Log.i(TAG, "Failure: No services found on UUID");
           }
         }
@@ -369,7 +375,7 @@ public class NeosensoryBlessed {
           } else if (characteristicUUID.equals(UART_TX_NOTIFY_UUID)) {
             neoCliResponse = parser.getStringValue(0);
             Log.i(TAG, String.format("Received notification: %s", neoCliResponse));
-            broadcastCLI(neoCliResponse);
+            broadcast(StatusUpdateType.CLIMESSAGE, neoCliResponse);
           } else if (characteristicUUID.equals(UART_RX_WRITE_UUID)) {
             String rx_write_val = parser.getStringValue(0);
             Log.i(TAG, String.format("Received rxwrite: %s", rx_write_val));
@@ -377,25 +383,32 @@ public class NeosensoryBlessed {
         }
       };
 
-  // create an Intent to broadcast if a connected Neosensory device is ready to accept commands
-  private void broadcastCliReadiness() {
-    Intent intent = new Intent("CliAvailable");
-    intent.putExtra("CliReady", neoCliReady);
-    context.sendBroadcast(intent);
+  private void broadcast(StatusUpdateType updateType, String message) {
+    Intent intent = new Intent("BlessedBroadcast");
+    switch (updateType) {
+      case CLIMESSAGE:
+        intent.putExtra("com.neosensory.neosensoryblessed.CliMessage", message);
+        context.sendBroadcast(intent);
+        break;
+      default:
+        break;
+    }
   }
 
-  // create an Intent to broadcast Neosensory CLI Output.
-  private void broadcastCLI(String CliResponse) {
-    Intent intent = new Intent("CliOutput");
-    intent.putExtra("CliResponse", CliResponse);
-    context.sendBroadcast(intent);
-  }
-
-  // create an Intent to broadcast a message for connection state changes.
-  private void broadcastConnectedState() {
-    Intent intent = new Intent("ConnectionState");
-    intent.putExtra("connectedState", neoDeviceConnected);
-    context.sendBroadcast(intent);
+  private void broadcast(StatusUpdateType updateType, Boolean state) {
+    Intent intent = new Intent("BlessedBroadcast");
+    switch (updateType) {
+      case CONNECTION:
+        intent.putExtra("com.neosensory.neosensoryblessed.ConnectedState", state);
+        context.sendBroadcast(intent);
+        break;
+      case CLIREADINESS:
+        intent.putExtra("com.neosensory.neosensoryblessed.CliReadiness", state);
+        context.sendBroadcast(intent);
+        break;
+      default:
+        break;
+    }
   }
 
   // Callbacks for processing Bluetooth state changes
@@ -407,16 +420,16 @@ public class NeosensoryBlessed {
         public void onConnectedPeripheral(BluetoothPeripheral peripheral) {
           Log.i(TAG, String.format("connected to '%s'", peripheral.getName()));
           neoDeviceConnected = true;
-          broadcastConnectedState();
+          broadcast(StatusUpdateType.CONNECTION,neoDeviceConnected);
         }
 
         // Upon a failed connection, log the output
         @Override
         public void onConnectionFailed(BluetoothPeripheral peripheral, final int status) {
           neoDeviceConnected = false;
-          broadcastConnectedState();
+          broadcast(StatusUpdateType.CONNECTION,neoDeviceConnected);
           neoCliReady = false;
-          broadcastCliReadiness();
+          broadcast(StatusUpdateType.CLIREADINESS,neoCliReady);
           Log.e(
               TAG,
               String.format("connection '%s' failed with status %d", peripheral.getName(), status));
@@ -427,9 +440,9 @@ public class NeosensoryBlessed {
         public void onDisconnectedPeripheral(
             final BluetoothPeripheral peripheral, final int status) {
           neoDeviceConnected = false;
-          broadcastConnectedState();
+          broadcast(StatusUpdateType.CONNECTION,neoDeviceConnected);
           neoCliReady = false;
-          broadcastCliReadiness();
+          broadcast(StatusUpdateType.CLIREADINESS,neoCliReady);
 
           Log.i(
               TAG, String.format("disconnected '%s' with status %d", peripheral.getName(), status));

@@ -57,7 +57,7 @@ public class MainActivity extends AppCompatActivity {
     if (checkLocationPermissions()) {
       displayInitConnectButton();
     } // Else, this function will have the system request permissions and handle displaying the
-      // button in the callback onRequestPermissionsResult
+    // button in the callback onRequestPermissionsResult
 
     // Create the vibrating pattern thread (but don't start it yet)
     vibratingPattern = new VibratingPattern();
@@ -115,8 +115,7 @@ public class MainActivity extends AppCompatActivity {
   @Override
   protected void onDestroy() {
     super.onDestroy();
-    unregisterReceiver(CliReceiver);
-    unregisterReceiver(CliReadyReceiver);
+    unregisterReceiver(BlessedReceiver);
     if (vibrating) {
       vibrating = false;
       disconnectRequested = true;
@@ -125,43 +124,62 @@ public class MainActivity extends AppCompatActivity {
     vibratingPatternThread = null;
   }
 
-  ////////////////////////////////////////////
-  // Bluetooth state change functionality   //
-  ///////////////////////////////////////////
+  ////////////////////////////////////
+  // SDK state change functionality //
+  ////////////////////////////////////
 
-  // onReceive of the CliReadyReceiver anytime the command line interface readiness changes state
-  private final BroadcastReceiver CliReadyReceiver =
+  // A Broadcast Receiver is responsible for conveying important messages/information from our
+  // NeosensoryBlessed instance. There are 3 types of messages we can receive:
+  //
+  // 1. "com.neosensory.neosensoryblessed.CliReadiness": conveys a change in state for whether or
+  // not a connected Buzz is ready to accept commands over its command line interface. Note: If the
+  // CLI is ready, then it is currently a prerequisite that a compliant device is connected.
+  //
+  // 2. "com.neosensory.neosensoryblessed.ConnectedState": conveys a change in state for whether or
+  // not we're connected to a device. True == connected, False == not connected. In this example, we
+  // don't actually need this, because we can use the CLI's readiness by proxy.
+  //
+  // 3. "com.neosensory.neosensoryblessed.CliMessage": conveys a message sent to Android from a
+  // connected Neosensory device's command line interface
+  private final BroadcastReceiver BlessedReceiver =
       new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
-          // Check the message from NeosensoryBlessed to see if a Neosensory Command Line Interface
-          // has become ready to accept commands
-          // Prior to calling other API commands we need to accept the Neosensory API ToS
-          if (blessedNeo.getNeoCliReady()) {
-            // request developer level access to the connected Neosensory device
-            blessedNeo.sendDeveloperAPIAuth();
-            // sendDeveloperAPIAuth() will then transmit a message back requiring an explicit
-            // acceptance of Neosensory's Terms of Service located at
-            // https://neosensory.com/legal/dev-terms-service/
-            blessedNeo.acceptApiTerms();
-            Log.i(TAG, String.format("state message: %s", blessedNeo.getNeoCliResponse()));
-            // Assuming successful authorization, set up a button to run the vibrating pattern
-            // thread above
-            displayVibrateButton();
-            displayDisconnectUI();
-          } else {
-            displayReconnectUI();
+          if (intent.hasExtra("com.neosensory.neosensoryblessed.CliReadiness")) {
+            // Check the message from NeosensoryBlessed to see if a Neosensory Command Line
+            // Interface
+            // has become ready to accept commands
+            // Prior to calling other API commands we need to accept the Neosensory API ToS
+            if (intent.getBooleanExtra("com.neosensory.neosensoryblessed.CliReadiness", false)) {
+              // request developer level access to the connected Neosensory device
+              blessedNeo.sendDeveloperAPIAuth();
+              // sendDeveloperAPIAuth() will then transmit a message back requiring an explicit
+              // acceptance of Neosensory's Terms of Service located at
+              // https://neosensory.com/legal/dev-terms-service/
+              blessedNeo.acceptApiTerms();
+              Log.i(TAG, String.format("state message: %s", blessedNeo.getNeoCliResponse()));
+              // Assuming successful authorization, set up a button to run the vibrating pattern
+              // thread above
+              displayVibrateButton();
+              displayDisconnectUI();
+            } else {
+              displayReconnectUI();
+            }
           }
-        }
-      };
 
-  // This BroadcastReceiver creates a notification whenever the connected device sends a response.
-  private final BroadcastReceiver CliReceiver =
-      new BroadcastReceiver() {
-        @Override
-        public void onReceive(Context context, Intent intent) {
-          String notification_value = blessedNeo.getNeoCliResponse();
-          neoCliOutput.setText(notification_value);
+          if (intent.hasExtra("com.neosensory.neosensoryblessed.CliMessage")) {
+            String notification_value =
+                intent.getStringExtra("com.neosensory.neosensoryblessed.CliMessage");
+            neoCliOutput.setText(notification_value);
+          }
+
+          if (intent.hasExtra("com.neosensory.neosensoryblessed.ConnectedState")) {
+            if (intent.getBooleanExtra("com.neosensory.neosensoryblessed.ConnectedState", false)) {
+              Log.i(TAG, "Connected to Buzz");
+            } else {
+              Log.i(TAG, "Disconnected from Buzz");
+            }
+          }
         }
       };
 
@@ -263,13 +281,8 @@ public class MainActivity extends AppCompatActivity {
     // false);
     blessedNeo =
         NeosensoryBlessed.getInstance(getApplicationContext(), new String[] {"Buzz"}, false);
-    // register receivers so that NeosensoryBlessed can pass relevant messages to MainActivity
-    registerReceiver(CliReceiver, new IntentFilter("CliOutput"));
-    registerReceiver(CliReadyReceiver, new IntentFilter("CliAvailable"));
-    // Note: there is also a Receiver for changes in the connection state, but is optional. If the
-    // command line interface (CLI) is available, it can be presumed that the device is connected.
-    // Similarly, on a disconnect, the CLI state Receiver will be called and the CLI will be
-    // unavailable.
+    // register receivers so that NeosensoryBlessed can pass relevant messages and state changes to MainActivity
+    registerReceiver(BlessedReceiver, new IntentFilter("BlessedBroadcast"));
   }
 
   private boolean checkLocationPermissions() {
