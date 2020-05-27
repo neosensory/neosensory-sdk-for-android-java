@@ -281,12 +281,8 @@ public class MainActivity extends AppCompatActivity {
     // false);
     blessedNeo =
         NeosensoryBlessed.getInstance(getApplicationContext(), new String[] {"Buzz"}, false);
-    // register receivers so that NeosensoryBlessed can pass relevant messages to MainActivity
+    // register receivers so that NeosensoryBlessed can pass relevant messages and state changes to MainActivity
     registerReceiver(BlessedReceiver, new IntentFilter("BlessedBroadcast"));
-    // Note: there is also a Receiver for changes in the connection state, but is optional. If the
-    // command line interface (CLI) is available, it can be presumed that the device is connected.
-    // Similarly, on a disconnect, the CLI state Receiver will be called and the CLI will be
-    // unavailable.
   }
 
   private boolean checkLocationPermissions() {
