@@ -19,7 +19,7 @@ This library connects any Neosensory hardware (currently just Buzz).
 
 ## Documentation
 
-See the pages for the module at https://neosensory.github.io/neosensory-sdk-for-android-java.
+See the pages for the module at https://neosensory.github.io/neosensory-sdk-for-android-java and the platform-agnostic API documentation that may be obtained at https://neosensory.com/developers/
 
 ## Examples
 
