@@ -24,7 +24,10 @@ import java.util.UUID;
 
 import static android.bluetooth.BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT;
 import static com.welie.blessed.BluetoothBytesParser.bytes2String;
-import static com.welie.blessed.BluetoothPeripheral.GATT_SUCCESS;
+//import static com.welie.blessed.BluetoothPeripheral.GATT_SUCCESS;
+import com.welie.blessed.GattStatus;
+import com.welie.blessed.WriteType;
+import com.welie.blessed.HciStatus;
 
 public class NeosensoryBlessed {
 
@@ -36,17 +39,17 @@ public class NeosensoryBlessed {
 
   // UUIDs for Neosensory UART over BLE
   private static final UUID UART_OVER_BLE_SERVICE_UUID =
-      UUID.fromString("6E400001-B5A3-F393-E0A9-E50E24DCCA9E");
+          UUID.fromString("6E400001-B5A3-F393-E0A9-E50E24DCCA9E");
   private static final UUID UART_RX_WRITE_UUID =
-      UUID.fromString("6E400002-B5A3-F393-E0A9-E50E24DCCA9E");
+          UUID.fromString("6E400002-B5A3-F393-E0A9-E50E24DCCA9E");
   private static final UUID UART_TX_NOTIFY_UUID =
-      UUID.fromString("6E400003-B5A3-F393-E0A9-E50E24DCCA9E");
+          UUID.fromString("6E400003-B5A3-F393-E0A9-E50E24DCCA9E");
 
   // UUIDs for the Device Information service (DIS)
   private static final UUID DIS_SERVICE_UUID =
-      UUID.fromString("0000180A-0000-1000-8000-00805f9b34fb");
+          UUID.fromString("0000180A-0000-1000-8000-00805f9b34fb");
   private static final UUID MANUFACTURER_NAME_CHARACTERISTIC_UUID =
-      UUID.fromString("00002A29-0000-1000-8000-00805f9b34fb");
+          UUID.fromString("00002A29-0000-1000-8000-00805f9b34fb");
 
   // Local variables
   private BluetoothCentral central;
@@ -99,7 +102,7 @@ public class NeosensoryBlessed {
   private boolean sendCommand(String CliCommand) {
     if ((neoDeviceConnected) && (neoCliReady)) {
       byte[] CliBytes = CliCommand.getBytes(StandardCharsets.UTF_8);
-      neoPeripheral.writeCharacteristic(neoWriteCharacteristic, CliBytes, WRITE_TYPE_DEFAULT);
+      neoPeripheral.writeCharacteristic(neoWriteCharacteristic, CliBytes, WriteType.WITHOUT_RESPONSE);
       return true;
     } else {
       return false;
@@ -261,7 +264,7 @@ public class NeosensoryBlessed {
     }
     byte[] b64motorValues = Base64.getEncoder().encode(motorValuesBytes);
     String fireCommand =
-        "motors vibrate " + new String(b64motorValues, StandardCharsets.UTF_8) + "\n";
+            "motors vibrate " + new String(b64motorValues, StandardCharsets.UTF_8) + "\n";
     return sendCommand(fireCommand);
   }
 
@@ -276,112 +279,115 @@ public class NeosensoryBlessed {
   public void attemptNeoReconnect() {
     if ((!neoDeviceConnected) && (neoPeripheral != null)) {
       handler.postDelayed(
-          new Runnable() {
-            @Override
-            public void run() {
-              central.autoConnectPeripheral(neoPeripheral, peripheralCallback);
-            }
-          },
-          5000);
+              new Runnable() {
+                @Override
+                public void run() {
+                  central.autoConnectPeripheral(neoPeripheral, peripheralCallback);
+                }
+              },
+              5000);
     }
   }
 
   // Callback for peripherals
   private final BluetoothPeripheralCallback peripheralCallback =
-      new BluetoothPeripheralCallback() {
+          new BluetoothPeripheralCallback() {
 
-        @RequiresApi(api = Build.VERSION_CODES.O)
-        @Override
-        public void onServicesDiscovered(BluetoothPeripheral peripheral) {
-          // Attempt to turn on notifications from the UART
-          if (peripheral.getService(UART_OVER_BLE_SERVICE_UUID) != null) {
-            BluetoothGattCharacteristic bleNotifyCharacteristic =
-                peripheral.getCharacteristic(UART_OVER_BLE_SERVICE_UUID, UART_TX_NOTIFY_UUID);
-            peripheral.setNotify(bleNotifyCharacteristic, true);
-            neoPeripheral = peripheral;
-            neoWriteCharacteristic =
-                peripheral.getCharacteristic(UART_OVER_BLE_SERVICE_UUID, UART_RX_WRITE_UUID);
-            neoCliReady = true;
-            broadcast(StatusUpdateType.CLIREADINESS,neoCliReady);
-            Log.i(TAG, "SUCCESS: CLI ready to accept commands");
 
-          } else {
-            neoCliReady = false;
-            broadcast(StatusUpdateType.CLIREADINESS,neoCliReady);
-            Log.i(TAG, "Failure: No services found on UUID");
-          }
-        }
 
-        // Log a successful change in notification status for the characteristic
-        @Override
-        public void onNotificationStateUpdate(
-            BluetoothPeripheral peripheral,
-            BluetoothGattCharacteristic characteristic,
-            int status) {
-          if (status == GATT_SUCCESS) {
-            if (peripheral.isNotifying(characteristic)) {
-              Log.i(
-                  TAG,
-                  String.format("SUCCESS: Notify set to 'on' for %s", characteristic.getUuid()));
-            } else {
-              Log.i(
-                  TAG,
-                  String.format("SUCCESS: Notify set to 'off' for %s", characteristic.getUuid()));
+
+            @RequiresApi(api = Build.VERSION_CODES.O)
+            @Override
+            public void onServicesDiscovered( BluetoothPeripheral peripheral)  {
+              // Attempt to turn on notifications from the UART
+              if (peripheral.getService(UART_OVER_BLE_SERVICE_UUID) != null) {
+                BluetoothGattCharacteristic bleNotifyCharacteristic =
+                        peripheral.getCharacteristic(UART_OVER_BLE_SERVICE_UUID, UART_TX_NOTIFY_UUID);
+                peripheral.setNotify(bleNotifyCharacteristic, true);
+                neoPeripheral = peripheral;
+                neoWriteCharacteristic =
+                        peripheral.getCharacteristic(UART_OVER_BLE_SERVICE_UUID, UART_RX_WRITE_UUID);
+                neoCliReady = true;
+                broadcast(StatusUpdateType.CLIREADINESS,neoCliReady);
+                Log.i(TAG, "SUCCESS: CLI ready to accept commands");
+
+              } else {
+                neoCliReady = false;
+                broadcast(StatusUpdateType.CLIREADINESS,neoCliReady);
+                Log.i(TAG, "Failure: No services found on UUID");
+              }
             }
-          } else {
-            Log.e(
-                TAG,
-                String.format(
-                    "ERROR: Changing notification state failed for %s", characteristic.getUuid()));
-          }
-        }
 
-        // Log pass/fail upon attempting a a write characteristic
-        @Override
-        public void onCharacteristicWrite(
-            BluetoothPeripheral peripheral,
-            byte[] value,
-            BluetoothGattCharacteristic characteristic,
-            int status) {
-          if (status == GATT_SUCCESS) {
-            Log.i(
-                TAG,
-                String.format(
-                    "SUCCESS: Writing <%s> to <%s>",
-                    bytes2String(value), characteristic.getUuid().toString()));
-          } else {
-            Log.i(
-                TAG,
-                String.format(
-                    "ERROR: Failed writing <%s> to <%s>",
-                    bytes2String(value), characteristic.getUuid().toString()));
-          }
-        }
+            // Log a successful change in notification status for the characteristic
+            @Override
+            public void onNotificationStateUpdate(
+                    BluetoothPeripheral peripheral,
+                    BluetoothGattCharacteristic characteristic,
+                    GattStatus status) {
+              if (status == GattStatus.SUCCESS) {
+                if (peripheral.isNotifying(characteristic)) {
+                  Log.i(
+                          TAG,
+                          String.format("SUCCESS: Notify set to 'on' for %s", characteristic.getUuid()));
+                } else {
+                  Log.i(
+                          TAG,
+                          String.format("SUCCESS: Notify set to 'off' for %s", characteristic.getUuid()));
+                }
+              } else {
+                Log.e(
+                        TAG,
+                        String.format(
+                                "ERROR: Changing notification state failed for %s", characteristic.getUuid()));
+              }
+            }
 
-        // For now we'll only broadcast UART_TX Notifications (i.e. CLI Output) in our module and
-        // send other notifications to logcat
-        @Override
-        public void onCharacteristicUpdate(
-            BluetoothPeripheral peripheral,
-            byte[] value,
-            BluetoothGattCharacteristic characteristic,
-            int status) {
-          if (status != GATT_SUCCESS) return;
-          UUID characteristicUUID = characteristic.getUuid();
-          BluetoothBytesParser parser = new BluetoothBytesParser(value);
-          if (characteristicUUID.equals(MANUFACTURER_NAME_CHARACTERISTIC_UUID)) {
-            String manufacturer = parser.getStringValue(0);
-            Log.i(TAG, String.format("Received manufacturer: %s", manufacturer));
-          } else if (characteristicUUID.equals(UART_TX_NOTIFY_UUID)) {
-            neoCliResponse = parser.getStringValue(0);
-            Log.i(TAG, String.format("Received notification: %s", neoCliResponse));
-            broadcast(StatusUpdateType.CLIMESSAGE, neoCliResponse);
-          } else if (characteristicUUID.equals(UART_RX_WRITE_UUID)) {
-            String rx_write_val = parser.getStringValue(0);
-            Log.i(TAG, String.format("Received rxwrite: %s", rx_write_val));
-          }
-        }
-      };
+            // Log pass/fail upon attempting a a write characteristic
+            @Override
+            public void onCharacteristicWrite(
+                    BluetoothPeripheral peripheral,
+                    byte[] value,
+                    BluetoothGattCharacteristic characteristic,
+                    GattStatus status) {
+              if (status == GattStatus.SUCCESS) {
+                Log.i(
+                        TAG,
+                        String.format(
+                                "SUCCESS: Writing <%s> to <%s>",
+                                bytes2String(value), characteristic.getUuid().toString()));
+              } else {
+                Log.i(
+                        TAG,
+                        String.format(
+                                "ERROR: Failed writing <%s> to <%s>",
+                                bytes2String(value), characteristic.getUuid().toString()));
+              }
+            }
+
+            // For now we'll only broadcast UART_TX Notifications (i.e. CLI Output) in our module and
+            // send other notifications to logcat
+            @Override
+            public void onCharacteristicUpdate(
+                    BluetoothPeripheral peripheral,
+                    byte[] value,
+                    BluetoothGattCharacteristic characteristic,
+                    GattStatus status) {
+              if (status != GattStatus.SUCCESS) return;
+              UUID characteristicUUID = characteristic.getUuid();
+              BluetoothBytesParser parser = new BluetoothBytesParser(value);
+              if (characteristicUUID.equals(MANUFACTURER_NAME_CHARACTERISTIC_UUID)) {
+                String manufacturer = parser.getStringValue(0);
+                Log.i(TAG, String.format("Received manufacturer: %s", manufacturer));
+              } else if (characteristicUUID.equals(UART_TX_NOTIFY_UUID)) {
+                neoCliResponse = parser.getStringValue(0);
+                Log.i(TAG, String.format("Received notification: %s", neoCliResponse));
+                broadcast(StatusUpdateType.CLIMESSAGE, neoCliResponse);
+              } else if (characteristicUUID.equals(UART_RX_WRITE_UUID)) {
+                String rx_write_val = parser.getStringValue(0);
+                Log.i(TAG, String.format("Received rxwrite: %s", rx_write_val));
+              }
+            }
+          };
 
   private void broadcast(StatusUpdateType updateType, String message) {
     Intent intent = new Intent("BlessedBroadcast");
@@ -413,61 +419,61 @@ public class NeosensoryBlessed {
 
   // Callbacks for processing Bluetooth state changes
   private final BluetoothCentralCallback bluetoothCentralCallback =
-      new BluetoothCentralCallback() {
-        // Upon connecting to a peripheral, log the output and  broadcast message (e.g. to Main
-        // Activity)
-        @Override
-        public void onConnectedPeripheral(BluetoothPeripheral peripheral) {
-          Log.i(TAG, String.format("connected to '%s'", peripheral.getName()));
-          neoDeviceConnected = true;
-          broadcast(StatusUpdateType.CONNECTION,neoDeviceConnected);
-        }
-
-        // Upon a failed connection, log the output
-        @Override
-        public void onConnectionFailed(BluetoothPeripheral peripheral, final int status) {
-          neoDeviceConnected = false;
-          broadcast(StatusUpdateType.CONNECTION,neoDeviceConnected);
-          neoCliReady = false;
-          broadcast(StatusUpdateType.CLIREADINESS,neoCliReady);
-          Log.e(
-              TAG,
-              String.format("connection '%s' failed with status %d", peripheral.getName(), status));
-        }
-
-        // Upon a disconnect, log the output and attempt to reconnect every 5 seconds.
-        @Override
-        public void onDisconnectedPeripheral(
-            final BluetoothPeripheral peripheral, final int status) {
-          neoDeviceConnected = false;
-          broadcast(StatusUpdateType.CONNECTION,neoDeviceConnected);
-          neoCliReady = false;
-          broadcast(StatusUpdateType.CLIREADINESS,neoCliReady);
-
-          Log.i(
-              TAG, String.format("disconnected '%s' with status %d", peripheral.getName(), status));
-          if (autoReconnectEnabled) {
-            if (!neoDeviceConnected) {
-              handler.postDelayed(
-                  new Runnable() {
-                    @Override
-                    public void run() {
-                      central.autoConnectPeripheral(peripheral, peripheralCallback);
-                    }
-                  },
-                  5000);
+          new BluetoothCentralCallback() {
+            // Upon connecting to a peripheral, log the output and  broadcast message (e.g. to Main
+            // Activity)
+            @Override
+            public void onConnectedPeripheral(BluetoothPeripheral peripheral) {
+              Log.i(TAG, String.format("connected to '%s'", peripheral.getName()));
+              neoDeviceConnected = true;
+              broadcast(StatusUpdateType.CONNECTION,neoDeviceConnected);
             }
-          }
-        }
 
-        // Upon discovering target peripheral, stop scan and initiate connection.
-        @Override
-        public void onDiscoveredPeripheral(BluetoothPeripheral peripheral, ScanResult scanResult) {
-          Log.i(TAG, String.format("Found peripheral '%s'", peripheral.getName()));
-          central.stopScan();
-          central.connectPeripheral(peripheral, peripheralCallback);
-        }
-      };
+            // Upon a failed connection, log the output
+            @Override
+            public void onConnectionFailed(BluetoothPeripheral peripheral, HciStatus status) {
+              neoDeviceConnected = false;
+              broadcast(StatusUpdateType.CONNECTION,neoDeviceConnected);
+              neoCliReady = false;
+              broadcast(StatusUpdateType.CLIREADINESS,neoCliReady);
+              Log.e(
+                      TAG,
+                      String.format("connection '%s' failed with status %d", peripheral.getName(), status));
+            }
+
+            // Upon a disconnect, log the output and attempt to reconnect every 5 seconds.
+            @Override
+            public void onDisconnectedPeripheral(
+                    final BluetoothPeripheral peripheral, HciStatus status) {
+              neoDeviceConnected = false;
+              broadcast(StatusUpdateType.CONNECTION,neoDeviceConnected);
+              neoCliReady = false;
+              broadcast(StatusUpdateType.CLIREADINESS,neoCliReady);
+
+              Log.i(
+                      TAG, String.format("disconnected '%s' with status %d", peripheral.getName(), status));
+              if (autoReconnectEnabled) {
+                if (!neoDeviceConnected) {
+                  handler.postDelayed(
+                          new Runnable() {
+                            @Override
+                            public void run() {
+                              central.autoConnectPeripheral(peripheral, peripheralCallback);
+                            }
+                          },
+                          5000);
+                }
+              }
+            }
+
+            // Upon discovering target peripheral, stop scan and initiate connection.
+            @Override
+            public void onDiscoveredPeripheral(BluetoothPeripheral peripheral, ScanResult scanResult) {
+              Log.i(TAG, String.format("Found peripheral '%s'", peripheral.getName()));
+              central.stopScan();
+              central.connectPeripheral(peripheral, peripheralCallback);
+            }
+          };
 
   /**
    * Request the Activity enable Bluetooth
@@ -501,7 +507,7 @@ public class NeosensoryBlessed {
    * @return the instance of the NeosensoryBlessed object
    */
   public static synchronized NeosensoryBlessed getInstance(
-      Context context, String[] neoNames, boolean autoReconnect) {
+          Context context, String[] neoNames, boolean autoReconnect) {
     if (instance == null) {
       instance = new NeosensoryBlessed(context.getApplicationContext(), neoNames, autoReconnect);
     }
@@ -520,7 +526,7 @@ public class NeosensoryBlessed {
    * @return the instance of the NeosensoryBlessed object
    */
   public static synchronized NeosensoryBlessed getInstance(
-      Context context, String neoAddress, boolean autoReconnect) {
+          Context context, String neoAddress, boolean autoReconnect) {
     if (instance == null) {
       instance = new NeosensoryBlessed(context.getApplicationContext(), neoAddress, autoReconnect);
     }
