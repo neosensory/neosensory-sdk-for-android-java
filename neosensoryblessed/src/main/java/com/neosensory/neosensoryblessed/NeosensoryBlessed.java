@@ -12,19 +12,24 @@ import android.util.Log;
 
 import androidx.annotation.RequiresApi;
 
+// imports from the blessed library
 import com.welie.blessed.BluetoothBytesParser;
-import com.welie.blessed.BluetoothCentral;
-import com.welie.blessed.BluetoothCentralCallback;
+import com.welie.blessed.BluetoothCentralManager;
+import com.welie.blessed.BluetoothCentralManagerCallback;
 import com.welie.blessed.BluetoothPeripheral;
 import com.welie.blessed.BluetoothPeripheralCallback;
+import com.welie.blessed.GattStatus;
+import com.welie.blessed.HciStatus;
+import com.welie.blessed.WriteType;
+import static com.welie.blessed.BluetoothBytesParser.bytes2String;
+
 
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.UUID;
 
 import static android.bluetooth.BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT;
-import static com.welie.blessed.BluetoothBytesParser.bytes2String;
-import static com.welie.blessed.BluetoothPeripheral.GATT_SUCCESS;
+
 
 public class NeosensoryBlessed {
 
@@ -49,7 +54,7 @@ public class NeosensoryBlessed {
       UUID.fromString("00002A29-0000-1000-8000-00805f9b34fb");
 
   // Local variables
-  private BluetoothCentral central;
+  private BluetoothCentralManager central;
   private static NeosensoryBlessed instance = null;
   private Context context;
   private Handler handler = new Handler();
@@ -99,7 +104,7 @@ public class NeosensoryBlessed {
   private boolean sendCommand(String CliCommand) {
     if ((neoDeviceConnected) && (neoCliReady)) {
       byte[] CliBytes = CliCommand.getBytes(StandardCharsets.UTF_8);
-      neoPeripheral.writeCharacteristic(neoWriteCharacteristic, CliBytes, WRITE_TYPE_DEFAULT);
+      neoPeripheral.writeCharacteristic(neoWriteCharacteristic, CliBytes, WriteType.WITH_RESPONSE);
       return true;
     } else {
       return false;
@@ -315,10 +320,10 @@ public class NeosensoryBlessed {
         // Log a successful change in notification status for the characteristic
         @Override
         public void onNotificationStateUpdate(
-            BluetoothPeripheral peripheral,
-            BluetoothGattCharacteristic characteristic,
-            int status) {
-          if (status == GATT_SUCCESS) {
+                BluetoothPeripheral peripheral,
+                BluetoothGattCharacteristic characteristic,
+                GattStatus status) {
+          if (status == GattStatus.SUCCESS) {
             if (peripheral.isNotifying(characteristic)) {
               Log.i(
                   TAG,
@@ -337,13 +342,12 @@ public class NeosensoryBlessed {
         }
 
         // Log pass/fail upon attempting a a write characteristic
-        @Override
         public void onCharacteristicWrite(
-            BluetoothPeripheral peripheral,
-            byte[] value,
-            BluetoothGattCharacteristic characteristic,
-            int status) {
-          if (status == GATT_SUCCESS) {
+                BluetoothPeripheral peripheral,
+                byte[] value,
+                BluetoothGattCharacteristic characteristic,
+                GattStatus status) {
+          if (status == GattStatus.SUCCESS) {
             Log.i(
                 TAG,
                 String.format(
@@ -362,11 +366,11 @@ public class NeosensoryBlessed {
         // send other notifications to logcat
         @Override
         public void onCharacteristicUpdate(
-            BluetoothPeripheral peripheral,
-            byte[] value,
-            BluetoothGattCharacteristic characteristic,
-            int status) {
-          if (status != GATT_SUCCESS) return;
+                BluetoothPeripheral peripheral,
+                byte[] value,
+                BluetoothGattCharacteristic characteristic,
+                GattStatus status) {
+          if (status != status.SUCCESS) return;
           UUID characteristicUUID = characteristic.getUuid();
           BluetoothBytesParser parser = new BluetoothBytesParser(value);
           if (characteristicUUID.equals(MANUFACTURER_NAME_CHARACTERISTIC_UUID)) {
@@ -412,8 +416,8 @@ public class NeosensoryBlessed {
   }
 
   // Callbacks for processing Bluetooth state changes
-  private final BluetoothCentralCallback bluetoothCentralCallback =
-      new BluetoothCentralCallback() {
+  private final BluetoothCentralManagerCallback bluetoothCentralManagerCallback =
+          new BluetoothCentralManagerCallback() {
         // Upon connecting to a peripheral, log the output and  broadcast message (e.g. to Main
         // Activity)
         @Override
@@ -425,7 +429,7 @@ public class NeosensoryBlessed {
 
         // Upon a failed connection, log the output
         @Override
-        public void onConnectionFailed(BluetoothPeripheral peripheral, final int status) {
+        public void onConnectionFailed(BluetoothPeripheral peripheral, HciStatus status) {
           neoDeviceConnected = false;
           broadcast(StatusUpdateType.CONNECTION,neoDeviceConnected);
           neoCliReady = false;
@@ -438,14 +442,14 @@ public class NeosensoryBlessed {
         // Upon a disconnect, log the output and attempt to reconnect every 5 seconds.
         @Override
         public void onDisconnectedPeripheral(
-            final BluetoothPeripheral peripheral, final int status) {
+                final BluetoothPeripheral peripheral, HciStatus status) {
           neoDeviceConnected = false;
           broadcast(StatusUpdateType.CONNECTION,neoDeviceConnected);
           neoCliReady = false;
           broadcast(StatusUpdateType.CLIREADINESS,neoCliReady);
 
           Log.i(
-              TAG, String.format("disconnected '%s' with status %d", peripheral.getName(), status));
+                  TAG, String.format("disconnected '%s' with status %s", peripheral.getName(), status.name()));
           if (autoReconnectEnabled) {
             if (!neoDeviceConnected) {
               handler.postDelayed(
@@ -539,7 +543,8 @@ public class NeosensoryBlessed {
     this.context = context;
     autoReconnectEnabled = autoReconnect;
     // Create BluetoothCentral
-    central = new BluetoothCentral(context, bluetoothCentralCallback, new Handler());
+    central = new BluetoothCentralManager(context, bluetoothCentralManagerCallback, new Handler());
+
     // Scan for peripherals with a certain service UUIDs
     central.startPairingPopupHack();
     central.scanForPeripheralsWithAddresses(new String[] {neoAddress});
@@ -560,7 +565,7 @@ public class NeosensoryBlessed {
     this.context = context;
     autoReconnectEnabled = autoReconnect;
     // Create BluetoothCentral
-    central = new BluetoothCentral(context, bluetoothCentralCallback, new Handler());
+    central = new BluetoothCentralManager(context, bluetoothCentralManagerCallback, new Handler());
     // Scan for peripherals with a certain service UUIDs
     central.startPairingPopupHack();
     central.scanForPeripheralsWithNames(neoNames);
