@@ -38,7 +38,7 @@ public class NeosensoryBlessed {
   private static final int REQUEST_ENABLE_BT = 1;
   public static final int MAX_VIBRATION_AMP = 255;
   public static final int MIN_VIBRATION_AMP = 0;
-
+  public static final int MAX_THRESHOLD = 64;
   // UUIDs for Neosensory UART over BLE
   private static final UUID UART_OVER_BLE_SERVICE_UUID =
       UUID.fromString("6E400001-B5A3-F393-E0A9-E50E24DCCA9E");
@@ -269,6 +269,70 @@ public class NeosensoryBlessed {
         "motors vibrate " + new String(b64motorValues, StandardCharsets.UTF_8) + "\n";
     return sendCommand(fireCommand);
   }
+  /**
+   * Set the color and intestiy of the 3 LEDs on a connected Neosensory Device:
+   * @param colorValues String array 3 hex values 1 for each LED each being a  hex integer
+   *    represented as String, range: 0 - 0xFFFFFF
+   * @param intensityValues Int Array of 3  intesitys 1 for each LED raning from 0 ( Off )  to 50 ( full glow )
+   */
+  public void  setLeds(String[] colorValues, int[] intensityValues) {
+    // check the string contents to makes sure they are filled.
+    // if the sting is null set to black and intesnity to 0
+    String colorV = colorValues[0] +" "+ colorValues[1] +" "+ colorValues[2];
+    String ledCommand = "leds set " + colorValues[0] +" "+ colorValues[1] +" "+ colorValues[2]+ " "+ intensityValues[0] + " " + intensityValues[1] + " " + intensityValues[2] +"\n";
+    sendCommand(ledCommand);
+
+  }
+  public void getLeds()
+  {
+    sendCommand("leds get");
+
+  }
+  /* Set motor config Threshold
+ * This command controls how the band responds to the “motors vibrate” command listed above.
+ *  @param feedbacktype
+ *    0 - defualt:In this configuration, the motors vibrate does not return a response unless
+ *         an error occurs.
+ *    1 - Always respond. In this configuration, the motors vibrate
+ *        command always returns a response.
+ *    2 - Threshold response. In this configuration, the motors vibrate
+ *        command only returns a response if the threshold is reached or
+*         exceeded.
+*   @param threshold decimal integer represented as char array, range: 0 - 64
+          *
+          */
+  public void setMotorConfigThreshold(int feedbackType, int threshold)
+  {
+    if ( threshold < MAX_THRESHOLD) { threshold = 64;}
+    String buttonThresholdCommand = "motors config_threshold "+ feedbackType + " " + threshold + "\n";
+    sendCommand(buttonThresholdCommand);
+  }
+
+  /* Get motor threshold.
+   *  remember to listen to the response.
+   */
+  public void getMotorThreshold ( ){sendCommand( "motors get_threshold");}
+
+  /*
+   * Set the LRA Mode for All. Either opened or closed.
+   * WARNING: running your LRA's in closed loop and overdrived may cause damage to the LRA's do so at your own risk.
+   * Check https://bit.ly/3c9qNFd for details abotu opened and closed loop usage.
+   * tl;dr closed loop will give you sharper breaking / more exact patterns.
+   * @param mode integer represented as char, range: 0 - 1
+   *   0 -  LRA open loop mode
+   *   1  - LRA close loop mode
+   */
+  public void setMotorLRAMode (int mode){
+
+    String motorLRAThresholdCommand = "motors config_lra_mode " + mode;
+    sendCommand(motorLRAThresholdCommand);
+
+  }
+  public void getMotorLRAMode(){
+    sendCommand( "motors get_lra_mode");
+  }
+
+
 
   /** If connected to a Neosensory device, disconnect it */
   public void disconnectNeoDevice() {

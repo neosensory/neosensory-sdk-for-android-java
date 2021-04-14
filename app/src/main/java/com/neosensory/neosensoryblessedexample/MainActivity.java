@@ -18,6 +18,11 @@ import android.widget.Toast;
 
 import com.neosensory.neosensoryblessed.NeosensoryBlessed;
 
+import org.json.JSONException;
+import org.json.JSONObject;
+
+import java.util.Objects;
+
 public class MainActivity extends AppCompatActivity {
   // set string for filtering output for this activity in Logcat
   private final String TAG = MainActivity.class.getSimpleName();
@@ -27,6 +32,8 @@ public class MainActivity extends AppCompatActivity {
   private TextView neoCliHeader;
   private Button neoConnectButton;
   private Button neoVibrateButton;
+  private Button neoLightPatternButton;
+  private Button neoLoopTypeButton;
 
   // Constants
   private static final int ACCESS_LOCATION_REQUEST = 2;
@@ -37,10 +44,20 @@ public class MainActivity extends AppCompatActivity {
 
   // Variable to track whether or not the wristband should be vibrating
   private static boolean vibrating = false;
+  // keep track of which mode we are in.
+  private static boolean closedLoop = false;
+  // track wether the lights are going.
+  private static boolean lightsGoing = false;
+
   private static boolean disconnectRequested =
-      false; // used for requesting a disconnect within our thread
+          false; // used for requesting a disconnect within our thread
+  // thread for vibrating pattern
   Runnable vibratingPattern;
   Thread vibratingPatternThread;
+  // thread for the rainbow light pattern
+  Runnable lightPattern;
+  Thread lightPatternThread;
+
 
   @Override
   protected void onCreate(Bundle savedInstanceState) {
@@ -51,6 +68,8 @@ public class MainActivity extends AppCompatActivity {
     neoCliHeader = (TextView) findViewById(R.id.cli_header);
     neoVibrateButton = (Button) findViewById(R.id.pattern_button);
     neoConnectButton = (Button) findViewById(R.id.connection_button);
+    neoLightPatternButton =(Button) findViewById(R.id.light_button);
+    neoLoopTypeButton =(Button )findViewById( R.id.loop_type_button);
 
     displayInitialUI();
     NeosensoryBlessed.requestBluetoothOn(this);
@@ -61,6 +80,8 @@ public class MainActivity extends AppCompatActivity {
 
     // Create the vibrating pattern thread (but don't start it yet)
     vibratingPattern = new VibratingPattern();
+    // Create the Light pattern thread (but don't start it yet)
+    lightPattern = new LightPattern();
   }
 
   // Create a Runnable (thread) to send a repeating vibrating pattern. Should terminate if
@@ -107,7 +128,82 @@ public class MainActivity extends AppCompatActivity {
       }
     }
   }
+  /*
+   *  Light Pattern thread.
+   *  Cyle through hues
+   */
 
+  class LightPattern implements Runnable {
+    private int minVibration = 40;
+    private int currentVibration = minVibration;
+    public void run() {
+      float c = 0;
+      double hueStep;
+      int color;
+      int r=255,g=0,b=0;
+      int step= 10;
+      int count = 0;
+      while (!Thread.currentThread().isInterrupted() && lightsGoing) {
+        try{
+          Thread.sleep(10);
+          if(r > 0 && b == 0){
+            r--;
+            g++;
+          }
+          if(g > 0 && r == 0){
+            g--;
+            b++;
+          }
+          if(b > 0 && g == 0){
+            r++;
+            b--;
+          }
+
+
+
+          String hex = String.format("%02X%02X%02X", r,g,b);
+          // pretty rainbow loop.
+          String hex1 = "0x"+hex;
+          String hex2 = "0x"+hex;;
+          String hex3 = "0x"+hex;;
+
+
+          //Hex
+
+          String [] colorValues = { hex1,hex2,hex3};
+          int [] intensityValues = {50,50,50};
+
+          // send to lights using an count so we don't send it every cycle of the thread.
+          count ++;
+          if( count == 200) {
+            blessedNeo.setLeds(colorValues, intensityValues);
+            count =0;
+          }
+        }
+        catch (InterruptedException e) {
+          e.printStackTrace();
+        }
+
+      }
+      if (disconnectRequested) {
+        Log.i(TAG, "Disconnect requested while thread active");
+        blessedNeo.stopMotors();
+        blessedNeo.resumeDeviceAlgorithm();
+        // When disconnecting: it is possible for the device to process the disconnection request
+        // prior to processing the request to resume the onboard algorithm, which causes the last
+        // sent motor command to "stick"
+        try {
+          Thread.sleep(200);
+        } catch (InterruptedException e) {
+          e.printStackTrace();
+        }
+        blessedNeo.disconnectNeoDevice();
+        disconnectRequested = false;
+      }
+
+
+    }
+  }
   //////////////////////////
   // Cleanup on shutdown //
   /////////////////////////
@@ -122,6 +218,7 @@ public class MainActivity extends AppCompatActivity {
     }
     blessedNeo = null;
     vibratingPatternThread = null;
+    lightPatternThread = null;
   }
 
   ////////////////////////////////////
@@ -162,6 +259,8 @@ public class MainActivity extends AppCompatActivity {
               // thread above
               displayVibrateButton();
               displayDisconnectUI();
+              displayLightButton();
+              displayLRAButton();
             } else {
               displayReconnectUI();
             }
@@ -170,6 +269,34 @@ public class MainActivity extends AppCompatActivity {
           if (intent.hasExtra("com.neosensory.neosensoryblessed.CliMessage")) {
             String notification_value =
                 intent.getStringExtra("com.neosensory.neosensoryblessed.CliMessage");
+            try {
+              JSONObject obj = new JSONObject(notification_value);
+              String type = obj.getString("type");
+              if( Objects.equals(type,"button_press"))
+              {
+                JSONObject  data = obj.getJSONObject("data");
+                int button = data.getInt("button_val");
+                switch(button){
+                  case 1:
+                    notification_value = "PLUS BUTTON PRESSED";
+                    // do some action
+                    break;
+                  case 2:
+                    notification_value ="POWER BUTTON PRESSED";
+                    // do some action
+                    break;
+                  case 3:
+                    notification_value ="MINUS BUTTON PRESSED";
+                    // do some action
+                    break;
+
+                }
+
+
+              }
+            } catch (JSONException e) {
+              e.printStackTrace();
+            }
             neoCliOutput.setText(notification_value);
           }
 
@@ -206,12 +333,56 @@ public class MainActivity extends AppCompatActivity {
             }
           }
         });
+    neoLightPatternButton.setOnClickListener(
+            new View.OnClickListener() {
+              public void onClick(View v) {
+                if (!lightsGoing) {
+                  blessedNeo.pauseDeviceAlgorithm();
+                  neoLightPatternButton.setText("Stop Light Pattern");
+                  lightsGoing = true;
+                  // run the vibrating pattern loop
+                  lightPatternThread = new Thread(lightPattern);
+                  lightPatternThread.start();
+                } else {
+                  neoLightPatternButton.setText("Start lights Pattern");
+                  lightsGoing = false;
+                  lightPatternThread = null;
+                  // turn the leds off
+                  String hex = "0xff";
+                  String [] colorValues = { hex,hex,hex};
+                  int [] intensityValues = {0,0,0};
+                  blessedNeo.setLeds(colorValues,intensityValues);
+
+                }
+              }
+            }
+    );
+    neoLoopTypeButton.setOnClickListener(
+            new View.OnClickListener() {
+              public void onClick(View v) {
+                if (!closedLoop) {
+
+                  neoLoopTypeButton.setText("Open Loop");
+                  closedLoop = true;
+                  // change to closed loop
+                  blessedNeo.setMotorLRAMode(1);
+                } else {
+                  neoLoopTypeButton.setText("Closed Loop");
+                  closedLoop = false;
+                  // change to closed loop
+                  blessedNeo.setMotorLRAMode(0);
+
+                }
+              }
+            }
+    );
   }
 
   private void displayReconnectUI() {
     neoCliOutput.setVisibility(View.INVISIBLE);
     neoCliHeader.setVisibility(View.INVISIBLE);
     neoVibrateButton.setVisibility(View.INVISIBLE);
+
     neoVibrateButton.setClickable(false);
     neoVibrateButton.setText(
         "Start Vibration Pattern"); // Vibration stops on disconnect so reset the button text
@@ -223,6 +394,12 @@ public class MainActivity extends AppCompatActivity {
             toastMessage("Attempting to reconnect. This may take a few seconds.");
           }
         });
+    // hid the light pattern button.
+    neoLightPatternButton.setVisibility(View.INVISIBLE);
+    neoLightPatternButton.setClickable(false);
+    // hide the loop button
+    neoLoopTypeButton.setVisibility(View.INVISIBLE);
+    neoLoopTypeButton.setClickable(false);
   }
 
   private void displayDisconnectUI() {
@@ -262,7 +439,15 @@ public class MainActivity extends AppCompatActivity {
     neoVibrateButton.setVisibility(View.VISIBLE);
     neoVibrateButton.setClickable(true);
   }
-
+  public void displayLightButton() {
+    neoLightPatternButton.setVisibility(View.VISIBLE);
+    neoLightPatternButton.setClickable(true);
+  }
+  public void displayLRAButton()
+  {
+    neoLoopTypeButton.setVisibility(View.VISIBLE);
+    neoLoopTypeButton.setClickable(true);
+  }
   private void toastMessage(String message) {
     Context context = getApplicationContext();
     int duration = Toast.LENGTH_LONG;
