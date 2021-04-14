@@ -12,19 +12,24 @@ import android.util.Log;
 
 import androidx.annotation.RequiresApi;
 
+// imports from the blessed library
 import com.welie.blessed.BluetoothBytesParser;
-import com.welie.blessed.BluetoothCentral;
-import com.welie.blessed.BluetoothCentralCallback;
+import com.welie.blessed.BluetoothCentralManager;
+import com.welie.blessed.BluetoothCentralManagerCallback;
 import com.welie.blessed.BluetoothPeripheral;
 import com.welie.blessed.BluetoothPeripheralCallback;
+import com.welie.blessed.GattStatus;
+import com.welie.blessed.HciStatus;
+import com.welie.blessed.WriteType;
+import static com.welie.blessed.BluetoothBytesParser.bytes2String;
+
 
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.UUID;
 
 import static android.bluetooth.BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT;
-import static com.welie.blessed.BluetoothBytesParser.bytes2String;
-import static com.welie.blessed.BluetoothPeripheral.GATT_SUCCESS;
+
 
 public class NeosensoryBlessed {
 
@@ -33,7 +38,7 @@ public class NeosensoryBlessed {
   private static final int REQUEST_ENABLE_BT = 1;
   public static final int MAX_VIBRATION_AMP = 255;
   public static final int MIN_VIBRATION_AMP = 0;
-
+  public static final int MAX_THRESHOLD = 64;
   // UUIDs for Neosensory UART over BLE
   private static final UUID UART_OVER_BLE_SERVICE_UUID =
       UUID.fromString("6E400001-B5A3-F393-E0A9-E50E24DCCA9E");
@@ -49,7 +54,7 @@ public class NeosensoryBlessed {
       UUID.fromString("00002A29-0000-1000-8000-00805f9b34fb");
 
   // Local variables
-  private BluetoothCentral central;
+  private BluetoothCentralManager central;
   private static NeosensoryBlessed instance = null;
   private Context context;
   private Handler handler = new Handler();
@@ -99,7 +104,7 @@ public class NeosensoryBlessed {
   private boolean sendCommand(String CliCommand) {
     if ((neoDeviceConnected) && (neoCliReady)) {
       byte[] CliBytes = CliCommand.getBytes(StandardCharsets.UTF_8);
-      neoPeripheral.writeCharacteristic(neoWriteCharacteristic, CliBytes, WRITE_TYPE_DEFAULT);
+      neoPeripheral.writeCharacteristic(neoWriteCharacteristic, CliBytes, WriteType.WITH_RESPONSE);
       return true;
     } else {
       return false;
@@ -264,6 +269,70 @@ public class NeosensoryBlessed {
         "motors vibrate " + new String(b64motorValues, StandardCharsets.UTF_8) + "\n";
     return sendCommand(fireCommand);
   }
+  /**
+   * Set the color and intestiy of the 3 LEDs on a connected Neosensory Device:
+   * @param colorValues String array 3 hex values 1 for each LED each being a  hex integer
+   *    represented as String, range: 0 - 0xFFFFFF
+   * @param intensityValues Int Array of 3  intesitys 1 for each LED raning from 0 ( Off )  to 50 ( full glow )
+   */
+  public void  setLeds(String[] colorValues, int[] intensityValues) {
+    // check the string contents to makes sure they are filled.
+    // if the sting is null set to black and intesnity to 0
+    String colorV = colorValues[0] +" "+ colorValues[1] +" "+ colorValues[2];
+    String ledCommand = "leds set " + colorValues[0] +" "+ colorValues[1] +" "+ colorValues[2]+ " "+ intensityValues[0] + " " + intensityValues[1] + " " + intensityValues[2] +"\n";
+    sendCommand(ledCommand);
+
+  }
+  public void getLeds()
+  {
+    sendCommand("leds get");
+
+  }
+  /* Set motor config Threshold
+ * This command controls how the band responds to the “motors vibrate” command listed above.
+ *  @param feedbacktype
+ *    0 - defualt:In this configuration, the motors vibrate does not return a response unless
+ *         an error occurs.
+ *    1 - Always respond. In this configuration, the motors vibrate
+ *        command always returns a response.
+ *    2 - Threshold response. In this configuration, the motors vibrate
+ *        command only returns a response if the threshold is reached or
+*         exceeded.
+*   @param threshold decimal integer represented as char array, range: 0 - 64
+          *
+          */
+  public void setMotorConfigThreshold(int feedbackType, int threshold)
+  {
+    if ( threshold < MAX_THRESHOLD) { threshold = 64;}
+    String buttonThresholdCommand = "motors config_threshold "+ feedbackType + " " + threshold + "\n";
+    sendCommand(buttonThresholdCommand);
+  }
+
+  /* Get motor threshold.
+   *  remember to listen to the response.
+   */
+  public void getMotorThreshold ( ){sendCommand( "motors get_threshold");}
+
+  /*
+   * Set the LRA Mode for All. Either opened or closed.
+   * WARNING: running your LRA's in closed loop and overdrived may cause damage to the LRA's do so at your own risk.
+   * Check https://bit.ly/3c9qNFd for details abotu opened and closed loop usage.
+   * tl;dr closed loop will give you sharper breaking / more exact patterns.
+   * @param mode integer represented as char, range: 0 - 1
+   *   0 -  LRA open loop mode
+   *   1  - LRA close loop mode
+   */
+  public void setMotorLRAMode (int mode){
+
+    String motorLRAThresholdCommand = "motors config_lra_mode " + mode;
+    sendCommand(motorLRAThresholdCommand);
+
+  }
+  public void getMotorLRAMode(){
+    sendCommand( "motors get_lra_mode");
+  }
+
+
 
   /** If connected to a Neosensory device, disconnect it */
   public void disconnectNeoDevice() {
@@ -315,10 +384,10 @@ public class NeosensoryBlessed {
         // Log a successful change in notification status for the characteristic
         @Override
         public void onNotificationStateUpdate(
-            BluetoothPeripheral peripheral,
-            BluetoothGattCharacteristic characteristic,
-            int status) {
-          if (status == GATT_SUCCESS) {
+                BluetoothPeripheral peripheral,
+                BluetoothGattCharacteristic characteristic,
+                GattStatus status) {
+          if (status == GattStatus.SUCCESS) {
             if (peripheral.isNotifying(characteristic)) {
               Log.i(
                   TAG,
@@ -337,13 +406,12 @@ public class NeosensoryBlessed {
         }
 
         // Log pass/fail upon attempting a a write characteristic
-        @Override
         public void onCharacteristicWrite(
-            BluetoothPeripheral peripheral,
-            byte[] value,
-            BluetoothGattCharacteristic characteristic,
-            int status) {
-          if (status == GATT_SUCCESS) {
+                BluetoothPeripheral peripheral,
+                byte[] value,
+                BluetoothGattCharacteristic characteristic,
+                GattStatus status) {
+          if (status == GattStatus.SUCCESS) {
             Log.i(
                 TAG,
                 String.format(
@@ -362,11 +430,11 @@ public class NeosensoryBlessed {
         // send other notifications to logcat
         @Override
         public void onCharacteristicUpdate(
-            BluetoothPeripheral peripheral,
-            byte[] value,
-            BluetoothGattCharacteristic characteristic,
-            int status) {
-          if (status != GATT_SUCCESS) return;
+                BluetoothPeripheral peripheral,
+                byte[] value,
+                BluetoothGattCharacteristic characteristic,
+                GattStatus status) {
+          if (status != status.SUCCESS) return;
           UUID characteristicUUID = characteristic.getUuid();
           BluetoothBytesParser parser = new BluetoothBytesParser(value);
           if (characteristicUUID.equals(MANUFACTURER_NAME_CHARACTERISTIC_UUID)) {
@@ -412,8 +480,8 @@ public class NeosensoryBlessed {
   }
 
   // Callbacks for processing Bluetooth state changes
-  private final BluetoothCentralCallback bluetoothCentralCallback =
-      new BluetoothCentralCallback() {
+  private final BluetoothCentralManagerCallback bluetoothCentralManagerCallback =
+          new BluetoothCentralManagerCallback() {
         // Upon connecting to a peripheral, log the output and  broadcast message (e.g. to Main
         // Activity)
         @Override
@@ -425,7 +493,7 @@ public class NeosensoryBlessed {
 
         // Upon a failed connection, log the output
         @Override
-        public void onConnectionFailed(BluetoothPeripheral peripheral, final int status) {
+        public void onConnectionFailed(BluetoothPeripheral peripheral, HciStatus status) {
           neoDeviceConnected = false;
           broadcast(StatusUpdateType.CONNECTION,neoDeviceConnected);
           neoCliReady = false;
@@ -438,14 +506,14 @@ public class NeosensoryBlessed {
         // Upon a disconnect, log the output and attempt to reconnect every 5 seconds.
         @Override
         public void onDisconnectedPeripheral(
-            final BluetoothPeripheral peripheral, final int status) {
+                final BluetoothPeripheral peripheral, HciStatus status) {
           neoDeviceConnected = false;
           broadcast(StatusUpdateType.CONNECTION,neoDeviceConnected);
           neoCliReady = false;
           broadcast(StatusUpdateType.CLIREADINESS,neoCliReady);
 
           Log.i(
-              TAG, String.format("disconnected '%s' with status %d", peripheral.getName(), status));
+                  TAG, String.format("disconnected '%s' with status %s", peripheral.getName(), status.name()));
           if (autoReconnectEnabled) {
             if (!neoDeviceConnected) {
               handler.postDelayed(
@@ -539,7 +607,8 @@ public class NeosensoryBlessed {
     this.context = context;
     autoReconnectEnabled = autoReconnect;
     // Create BluetoothCentral
-    central = new BluetoothCentral(context, bluetoothCentralCallback, new Handler());
+    central = new BluetoothCentralManager(context, bluetoothCentralManagerCallback, new Handler());
+
     // Scan for peripherals with a certain service UUIDs
     central.startPairingPopupHack();
     central.scanForPeripheralsWithAddresses(new String[] {neoAddress});
@@ -560,7 +629,7 @@ public class NeosensoryBlessed {
     this.context = context;
     autoReconnectEnabled = autoReconnect;
     // Create BluetoothCentral
-    central = new BluetoothCentral(context, bluetoothCentralCallback, new Handler());
+    central = new BluetoothCentralManager(context, bluetoothCentralManagerCallback, new Handler());
     // Scan for peripherals with a certain service UUIDs
     central.startPairingPopupHack();
     central.scanForPeripheralsWithNames(neoNames);
