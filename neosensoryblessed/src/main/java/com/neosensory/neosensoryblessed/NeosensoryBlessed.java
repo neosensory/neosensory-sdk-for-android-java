@@ -288,6 +288,25 @@ public class NeosensoryBlessed {
     sendCommand("leds get");
 
   }
+  /*  Set the response from the physical buttons on the Neosensory device.
+   * @param feedback Set to either 0 or 1 - 0 means that no response will be sent, 1 the band will send an unsolicited CLI response each
+   * time any button is pressed. -
+   * Responses:
+   *   “status_code”: 201
+   *   “type”: “button_press”
+   *   “button_val”:
+   *       1 = Plus button was pressed
+   *       2 = Power button was pressed
+   *       3 = Minus button was pressed
+   */
+
+  public void setButtonResponse(int feedback, int sensitivty)
+  {
+    String enableFeedback = feedback + " ";
+    String sensitivtyFeedback = " " + sensitivty;
+    String buttonCommand = "config set_buttons_response " +enableFeedback + sensitivtyFeedback + "\n";
+    sendCommand ( buttonCommand );
+  }
   /* Set motor config Threshold
  * This command controls how the band responds to the “motors vibrate” command listed above.
  *  @param feedbacktype

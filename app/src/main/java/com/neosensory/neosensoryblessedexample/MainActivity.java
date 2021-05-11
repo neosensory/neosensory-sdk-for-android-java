@@ -261,44 +261,58 @@ public class MainActivity extends AppCompatActivity {
               displayDisconnectUI();
               displayLightButton();
               displayLRAButton();
+
+              // Turn buttons response on and turn off + amd - changing mic sensitivity.
+              blessedNeo.setButtonResponse(1, 0);
+
             } else {
               displayReconnectUI();
             }
           }
 
           if (intent.hasExtra("com.neosensory.neosensoryblessed.CliMessage")) {
-            String notification_value =
+            String notification_value_CLI =
                 intent.getStringExtra("com.neosensory.neosensoryblessed.CliMessage");
-            try {
-              JSONObject obj = new JSONObject(notification_value);
-              String type = obj.getString("type");
-              if( Objects.equals(type,"button_press"))
-              {
-                JSONObject  data = obj.getJSONObject("data");
-                int button = data.getInt("button_val");
-                switch(button){
-                  case 1:
-                    notification_value = "PLUS BUTTON PRESSED";
-                    // do some action
-                    break;
-                  case 2:
-                    notification_value ="POWER BUTTON PRESSED";
-                    // do some action
-                    break;
-                  case 3:
-                    notification_value ="MINUS BUTTON PRESSED";
-                    // do some action
-                    break;
+
+            String  notification_value = notification_value_CLI;
+            if (notification_value_CLI.contains("button_press")) {
+
+              try {
+                JSONObject obj = new JSONObject(notification_value_CLI);
+                String type = obj.getString("type");
+                if( Objects.equals(type,"button_press"))
+                {
+                  JSONObject  data = obj.getJSONObject("data");
+                  int buttonVal = data.getInt("button_val");
+                  switch(buttonVal){
+                    case 1:
+                      notification_value = "PLUS BUTTON PRESSED" + notification_value_CLI;
+                      // do some action
+                      break;
+                    case 2:
+                      notification_value ="POWER BUTTON PRESSED" + notification_value_CLI;
+                      // do some action
+                      break;
+                    case 3:
+                      notification_value ="MINUS BUTTON PRESSED" + notification_value_CLI;
+                      // do some action
+                      break;
+
+                  }
+
 
                 }
-
-
+              } catch (JSONException e) {
+                e.printStackTrace();
               }
-            } catch (JSONException e) {
-              e.printStackTrace();
+
+
             }
-            neoCliOutput.setText(notification_value);
-          }
+
+              neoCliOutput.setText(notification_value);
+            }
+
+
 
           if (intent.hasExtra("com.neosensory.neosensoryblessed.ConnectedState")) {
             if (intent.getBooleanExtra("com.neosensory.neosensoryblessed.ConnectedState", false)) {
